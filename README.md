@@ -12,6 +12,7 @@
 
 - **固件**：`Flight_Control/`，CMake + STM32CubeMX 工程，可直接编译烧录。
 - **可视化文档**：`flight-control-index.html`，把固件拆成 7 节 11 张图（模块关系、6 档节拍时序、生命周期、阅读路线、数据结构、函数调用链、分层架构）。每张图里点节点能看到 `文件:行号` 来源。
+- **设计说明**：`Flight_Control.xmind`，记录**为什么这么写**——CubeMX 的 11 步配置（含不能用硬件 I2C1 的 ST 勘误）、构建模式取舍、每个模块的设计意图。
 - **规划中的内容**：遥控器固件、原理图、PCB、学习笔记（见文末「路线图」）。
 
 代码规模：应用部分 87 个 `.c/.h`，10,606 行；另有 ST 官方 HAL/CMSIS 77 个源文件原样引入。
@@ -20,12 +21,28 @@
 
 ---
 
+## 三层材料怎么配合
+
+这个仓库刻意把信息分成三层，各回答一个问题：
+
+| 层 | 材料 | 回答的问题 |
+|---|---|---|
+| **为什么这么设计** | `Flight_Control.xmind` | 为什么用 DWT 不用 SysTick？为什么不用硬件 I2C1？64KB 装不下时改什么？ |
+| **模块怎么连** | [`flight-control-index.html`](./flight-control-index.html) | 谁给谁送数据、6 档节拍里谁先谁后、状态怎么迁移、一层怎么拼到另一层 |
+| **具体怎么算** | 源码里的逐行注释 | 每个函数的边界条件、状态迁移条件、公式与阈值从哪来 |
+
+建议的顺序：**先看 xmind 知道“为什么” → 再看页面知道“谁跟谁连” → 最后读代码看“一行一行怎么算”**。
+
+> `Flight_Control.xmind` 需要 XMind 打开（2020 及以后版本）。文件里另存了一份 `content.xml` 兼容占位，用第三方工具打开只会看到一张警告图，这是 XMind 的正常行为，不是文件损坏。
+
+---
+
 ## 目录结构
 
 ```
 STM32F103C8T6_Quadcopter/
-├── flight-control-index.html   可视化文档（自包含，12 MB）
-├── Flight_Control.xmind        思维导图
+├── flight-control-index.html   可视化文档：怎么连（7 张图，自包含 12 MB）
+├── Flight_Control.xmind        设计说明：为什么这么写（需 XMind 打开）
 └── Flight_Control/             固件工程
     ├── Core/                   CubeMX 生成：main.c、时钟、各外设 Init、中断（23 个文件）
     ├── Driver/                 自写外设驱动：MPU6050、SPL06、NRF24L01、MOTOR、BATTERY（12）
@@ -150,6 +167,7 @@ arm-none-eabi-objcopy -O binary build/Debug/Flight_Control.elf build/Debug/Fligh
 
 ## 怎么读这份代码
 
+0. **先看 `Flight_Control.xmind`** —— 每个模块“为什么这么写”都在那里，比从代码倒推快得多。
 1. `Core/Src/main.c` — 时钟怎么配、外设 Init 顺序、主循环只有一句 `Scheduler_Run()`。
 2. `Middleware/APP/Src/app.c` — 初始化链的依赖顺序都在这（先 I2C 才能 Init MPU6050，先 NRF 才能注册发送钩子）。
 3. `Middleware/SCHEDULER/Src/scheduler.c` — 6 档任务怎么分派。
