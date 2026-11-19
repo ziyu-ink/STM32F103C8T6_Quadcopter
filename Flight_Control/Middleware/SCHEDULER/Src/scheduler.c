@@ -18,6 +18,27 @@
 // TICK_PERIOD_US：基础节拍 2000us
 #define TICK_PERIOD_US 2000U
 
+/* 各档的真实周期（秒），给任务里的 dt 用，别再散落字面量 */
+
+// TASK_2MS_DT：2ms 档周期，姿态串级 PID 的 dt
+#define TASK_2MS_DT 0.002f
+// TASK_6MS_DT：6ms 档周期，Mahony 姿态解算的 dt
+#define TASK_6MS_DT 0.006f
+// TASK_10MS_DT：10ms 档周期（0.01s），高度环与缓降按这个算
+#define TASK_10MS_DT 0.01f
+// TASK_10MS_PERIOD_MS：同一个周期的毫秒写法（Control_Height_Calc 要的是毫秒）
+#define TASK_10MS_PERIOD_MS 10U
+
+/* TASK_10MS_DT_LEGACY：10ms 档里三个调用的"历史标度"。
+ *
+ * Pixel_Flow_Fix / Control_Position_Update / Control_Height_Update 一直传的是
+ * 0.006f（6ms 档的值），而本档真实周期是 10ms —— 两者并不相等。
+ *
+ * 现有增益（尤其光流速度环 kd 0.40、位置环 kd 0.006）就是在这个标度下整定的：
+ * 改成 0.01f 会让这三个环的微分项整体变成原来的 60%，等于同时改三个环的增益。
+ * 所以这里保留原值，只给它一个能看懂的名字；真要修正必须重新试飞整定。 */
+#define TASK_10MS_DT_LEGACY 0.006f
+
 static IMU_Angle_t s_angle = {0}; // s_angle：全局姿态角
 static uint32_t s_cnt_2ms = 0; // s_cnt_2ms：2ms 档计数
 static uint32_t s_cnt_4ms = 0; // s_cnt_4ms：4ms 档计数
@@ -44,7 +65,7 @@ static void Task_2ms(void)
     {
         // 读取成功仅刷新 s_mpu；读取失败时保留上一拍数据给姿态解算
     }
-    Control_Attitude_Update(&s_mpu, &s_angle, 0.002f);
+    Control_Attitude_Update(&s_mpu, &s_angle, TASK_2MS_DT);
     Control_Mixer_Update();
 }
 
@@ -143,7 +164,7 @@ static void Task_4ms(void)
  */
 static void Task_6ms(void)
 {
-    IMU_Get_Angle(&s_mpu, &s_angle, 0.006f);
+    IMU_Get_Angle(&s_mpu, &s_angle, TASK_6MS_DT);
 }
 
 /**
@@ -170,12 +191,12 @@ static void Task_10ms(void)
     }
 
     SPL06_Get_Data(&s_p, &s_t);
-    Pixel_Flow_Fix(0.006f, &s_angle);
-    Control_Position_Update(0.006f);
-    Control_Height_Get(s_p, 0.01f);
-    Control_Height_Calc(s_angle.yaw, 10U);
-    Control_Height_Update(0.006f);
-    Control_Descent_Update(&s_angle, 0.01f);
+    Pixel_Flow_Fix(TASK_10MS_DT_LEGACY, &s_angle);          // 历史标度 0.006f，见宏处注释
+    Control_Position_Update(TASK_10MS_DT_LEGACY);           // 历史标度 0.006f
+    Control_Height_Get(s_p, TASK_10MS_DT);                  // 真实 10ms
+    Control_Height_Calc(s_angle.yaw, TASK_10MS_PERIOD_MS);  // 真实 10ms（毫秒写法）
+    Control_Height_Update(TASK_10MS_DT_LEGACY);             // 历史标度 0.006f
+    Control_Descent_Update(&s_angle, TASK_10MS_DT);         // 真实 10ms
 
     ANO_DT_Send_Senser(s_mpu.ax, s_mpu.ay, s_mpu.az,s_mpu.gx, s_mpu.gy, s_mpu.gz,(int32_t)Flow.flow_x_iOUT, (int32_t)Flow.flow_y_iOUT,Flow.qual);
 }

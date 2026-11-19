@@ -163,7 +163,7 @@ arm-none-eabi-objcopy -O binary build/Debug/Flight_Control.elf build/Debug/Fligh
 
 ## 已知的坑
 
-- `Task_10ms` 里各个调用的 `dt` 并不统一：`Pixel_Flow_Fix` / `Control_Position_Update` / `Control_Height_Update` 传 `0.006f`，`Control_Height_Get` / `Control_Descent_Update` 传 `0.01f`，`Control_Height_Calc` 传的是 `10`（毫秒）。这是代码原样。
+- `Task_10ms` 里 6 个调用的 `dt` 分两种标度：`Control_Height_Get` / `Control_Descent_Update` / `Control_Height_Calc` 用真实 10ms（`TASK_10MS_DT`），另外三个 `Pixel_Flow_Fix` / `Control_Position_Update` / `Control_Height_Update` 用的是 `TASK_10MS_DT_LEGACY = 0.006f`（6ms 档的值）。**保留原值是有意的**：现有增益在这个标度下整定，改成 0.01 会让这三个环的微分项掉到 60%。宏与理由写在 `scheduler.c` 顶部。
 - `Control_Init()` 只写增益和业务标志，**不清 PID 内部状态**（`integ / prevError / out`）；要在解锁那一拍靠 `PID_Reset` 统一清零。
 - `IMU_Get_Angle` 的 `dt` 必须与 6 ms 真实周期一致，否则积分增益和收敛速度都会偏。
 - 光流 `loc_x` 来自 `out_y_i`、`loc_y` 来自 `out_x_i`（模块安装方向决定），不要“顺手改正”。

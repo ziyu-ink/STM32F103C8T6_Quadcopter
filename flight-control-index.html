@@ -52,8 +52,8 @@
 
   /* ---------- nav ---------- */
   nav{position:sticky; top:0; z-index:20; background:var(--navbg); border-bottom:1px solid var(--line2); -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px)}
-  nav ul{display:flex; gap:8px; margin:0; padding:10px var(--pad); list-style:none; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:thin}
-  nav a{display:inline-block; white-space:nowrap; font-size:13px; padding:5px 11px; border-radius:999px; border:1px solid var(--line); color:var(--dim); text-decoration:none}
+  nav ul{display:flex; gap:6px; margin:0; padding:10px var(--pad); list-style:none; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:thin}
+  nav a{display:inline-block; white-space:nowrap; font-size:13px; padding:5px 9px; border-radius:999px; border:1px solid var(--line); color:var(--dim); text-decoration:none}
   nav a:active,nav a.on{background:var(--chip); color:var(--cyan2); border-color:var(--chipon)}
 
   /* ---------- sections ---------- */
@@ -163,6 +163,7 @@
       <li><a href="#data">⑤ 数据结构</a></li>
       <li><a href="#call">⑥ 函数调用链</a></li>
       <li><a href="#layer">⑦ 分层架构</a></li>
+      <li><a href="#glossary">附 术语/误解</a></li>
       <li><a href="#port">附 移植/改功能</a></li>
     </ul>
   </nav>
@@ -195,6 +196,7 @@
       <li><b>⑤ 数据结构</b>：7 个跨层结构体撑起数据流，附 12 个 PID 的实际增益表。</li>
       <li><b>⑥ 函数调用链</b>：一条链从 Task_2ms 追到 TIM2-&gt;CCR1，看清每层只碰自己的东西。</li>
       <li><b>⑦ 分层架构</b>：四层边界怎么拼，谁依赖谁、换 MCU 时动哪一层。</li>
+      <li><b>附 术语/误解</b>：缩写表，以及九条“看着像写错、其实是有意为之”的地方。</li>
       <li><b>附 移植/改功能</b>：换主控、换传感器、加模式时该动哪一层，以及改完要回归哪些项。</li>
     </ol>
   </section>
@@ -287,9 +289,23 @@
         <span><span class="tag calc">合并读法</span><b>口径：</b>代码里没有统一的生命周期状态机——这张图把 <code>REMOTE</code> 的解锁状态机、<code>CONTROL</code> 的模式分支、<code>CONTROL</code> 的缓降状态机按一次飞行的顺序合并了。每个状态都标了对应源码。</span>
       </figcaption>
     </figure>
-  </section>
 
-  <!-- ================= ④ 阅读路线 ================= -->
+    <h3>五个状态机的名字</h3>
+    <p class="sub">代码里每个状态机都有自己的枚举，骨架统一成 <code>IDLE → 中间态 → RUN → EXIT</code>。下表就是源码里的状态名，可以直接对着 <code>case</code> 找。</p>
+    <div class="tablewrap">
+      <table>
+        <caption>状态机命名对照（原先共用一套 1 / 2 / 11 / 31 / 255 编号，已废弃）</caption>
+        <thead><tr><th>状态机</th><th>文件</th><th>状态序列</th></tr></thead>
+        <tbody>
+          <tr><td>姿态</td><td><code>control_attitude.c</code></td><td><code>ATT_IDLE</code> → <code>ATT_RESET</code> → <code>ATT_RUN</code> → <code>ATT_EXIT</code></td></tr>
+          <tr><td>混控</td><td><code>control_mixer.c</code></td><td><code>MIX_IDLE</code> → <code>MIX_ARMED</code> → <code>MIX_RUN</code> → <code>MIX_EXIT</code></td></tr>
+          <tr><td>定高</td><td><code>control_height.c</code></td><td><code>HGT_IDLE</code> → <code>HGT_READY</code> → <code>HGT_RUN</code> → <code>HGT_EXIT</code></td></tr>
+          <tr><td>缓降</td><td><code>control_descent.c</code></td><td><code>DESC_IDLE</code> → <code>DESC_ACTIVE</code> → <code>DESC_DONE</code></td></tr>
+          <tr><td>解锁</td><td><code>remote.c</code></td><td><code>RMT_IDLE</code> → <code>RMT_WAIT_HIGH</code> → <code>RMT_WAIT_LOW</code> → <code>RMT_ARM</code> → <code>RMT_RUN</code> → <code>RMT_EXIT</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
   <section id="route">
     <h2><span class="n">④</span>阅读路线</h2>
     <p class="sub">按打开顺序读，每一步都说明为什么现在读它。从入口一路到寄存器，再回头补算法。</p>
@@ -453,6 +469,60 @@
     </figure>
   </section>
 
+  <!-- ================= 附：术语与常见误解 ================= -->
+  <section id="glossary">
+    <h2><span class="n">附</span>术语与常见误解</h2>
+    <p class="sub">读代码时最容易卡住的两件事：缩写不知道指什么，以及“看起来像写错了”其实是有意为之。</p>
+
+    <h3>术语表</h3>
+    <div class="tablewrap">
+      <table>
+        <caption>本仓库里出现频率最高的一批词（按主题分组，不是字母序）</caption>
+        <thead><tr><th>词</th><th>含义</th></tr></thead>
+        <tbody>
+          <tr><td>拍</td><td>一次 2ms 基础节拍，所有任务都按“几拍”计数（如去抖 10 拍 = 40ms）</td></tr>
+          <tr><td>档</td><td>2 / 4 / 6 / 10 / 50 / 1000ms 六个执行周期之一</td></tr>
+          <tr><td>外环 / 内环</td><td>串级 PID 的两层：外环算目标（角度、位置），内环追目标（角速度、速度）</td></tr>
+          <tr><td>混控（mixer）</td><td>把油门基准与三轴力矩合成四路占空比</td></tr>
+          <tr><td>解锁 / 上锁</td><td>允许 / 禁止输出动力。解锁是三段油门手势，上锁是手势或自动触发</td></tr>
+          <tr><td>定高</td><td>高度环接管油门，摇杆改为高度微调</td></tr>
+          <tr><td>定点</td><td>光流位置环→速度环，输出期望倾角</td></tr>
+          <tr><td>缓降</td><td>失联或手动触发的自动下降状态机，触地上锁</td></tr>
+          <tr><td>抛飞</td><td>锁定态检测加速度先高后低，直接起飞</td></tr>
+          <tr><td>翻滚</td><td>只跑角速度内环的特技动作，角度外环被跳过</td></tr>
+          <tr><td>无头模式（carefree）</td><td>摇杆方向对应地理方向，不随机头朝向变化</td></tr>
+          <tr><td>DWT</td><td>内核里的周期计数器，2ms 节拍靠它计时（HAL 没有封装，是少数直接读寄存器的地方）</td></tr>
+          <tr><td>IWDG</td><td>独立看门狗，2ms 环里喂狗，超时复位</td></tr>
+          <tr><td>HAL / HALPort</td><td>ST 官方的硬件抽象库 / 本项目的端口适配层（把 HAL 再包一层）</td></tr>
+          <tr><td>软 I2C</td><td>用 GPIO 翻转模拟 I2C 时序（PB6 / PB7），不是硬件外设</td></tr>
+          <tr><td>LSB</td><td>传感器原始码值的最小单位</td></tr>
+          <tr><td>cpi</td><td>光流每个 LSB 对应多少厘米，本工程按 50cm 高度标定</td></tr>
+          <tr><td>qual</td><td>光流质量因子，≥25 才算有效帧</td></tr>
+          <tr><td>SSI</td><td>每秒有效帧数，遥控与光流都用它衡量链路质量</td></tr>
+          <tr><td>thr_temp</td><td>油门基准 = 遥控油门 − 1000</td></tr>
+          <tr><td>thr_temp1 / 2 / 3</td><td>一键起飞斜坡量 / 起飞目标 / 抛飞补偿</td></tr>
+          <tr><td>descent_thr</td><td>缓降接管时用的油门基准（混控会改用它）</td></tr>
+          <tr><td>baro_height / control_high</td><td>融合后的气压高度 / 最终采用的高度（光流优先，否则气压）</td></tr>
+          <tr><td>毛刺过滤</td><td>气压单拍突跳超过 4Pa 时先丢弃，连续 30 拍才接受</td></tr>
+          <tr><td>参数帧</td><td>地面站下发的 PID 帧（0x10~0x15）与命令帧（0xE0）</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>常见误解</h3>
+    <ol class="guide">
+      <li><b>“Task_10ms 里传 0.006f 是笔误”</b> —— 是历史标度。现在它有名字 <code>TASK_10MS_DT_LEGACY</code>；改成 0.01 会让三个环的微分项掉到 60%，等于改增益。</li>
+      <li><b>“光流速度环的 measured 应该是速度”</b> —— 本工程刻意用位置，等价于对位置做 P-D 控制；换成速度必须把三组增益整体重新整定。</li>
+      <li><b>“ki = 0 是忘了写”</b> —— 12 个环全是纯 P / PD，这是设计选择，不是缺省值。</li>
+      <li><b>“PID_Reset 会把 PID 清空”</b> —— 它只清 <code>integ / prevError / out</code>，增益和 <code>desired / measured</code> 都保留。</li>
+      <li><b>“Control_Init 可以随时调”</b> —— 它不重置 PID 内部状态；上电靠 <code>.bss</code> 清零没问题，运行期（收到 0xE0 恢复默认）会带着旧积分。</li>
+      <li><b>“11 / 31 / 255 有特殊含义”</b> —— 没有。已改成 <code>ATT_* / MIX_* / HGT_* / DESC_* / RMT_*</code> 枚举，见 ③。</li>
+      <li><b>“光流 loc_x 应该来自 x 轴”</b> —— 按模块安装方向，<code>loc_x</code> 来自 <code>out_y_i</code>、<code>loc_y</code> 来自 <code>out_x_i</code>，不能“顺手改正”。</li>
+      <li><b>“IMU 的 dt 随便填”</b> —— 它直接乘进四元数积分和 yaw 积分，改周期必须同步改它。</li>
+      <li><b>“电调是 1000~2000 微秒”</b> —— 本工程是 18kHz、占空比 0~1000，不是标准电调脉宽。</li>
+    </ol>
+  </section>
+
   <!-- ================= 附：移植与改功能 ================= -->
   <section id="port">
     <h2><span class="n">附</span>移植与改功能清单</h2>
@@ -585,7 +655,7 @@
   </main>
 
   <footer class="foot">
-    <p class="build"><b>构建标记：</b><code>2026-11-19 14:05 · v6-state-names</code> · 这一行就是版本凭证——如果你打开的页面底部看不到它，说明看的是旧文件或浏览器缓存，按 Ctrl+F5（手机：下拉刷新）强制刷新即可。</p>
+    <p class="build"><b>构建标记：</b><code>2026-11-19 14:16 · v7-glossary</code> · 这一行就是版本凭证——如果你打开的页面底部看不到它，说明看的是旧文件或浏览器缓存，按 Ctrl+F5（手机：下拉刷新）强制刷新即可。</p>
     <p><b>图怎么来的：</b>每张图都是 Archify 生成的独立 HTML，以 <code>data:text/html;base64</code> 内嵌在本页里（除第一张外均为 <code>loading="lazy"</code>），所以整页离线可看、不请求任何外部资源。</p>
     <p><b>图内 revision：</b><code>3d0522b</code>（导入源码的基线提交）。页面文件本身在之后的提交里，因此页面所在 commit 会与图内 revision 不同——图描述的是那份源码，不是页面自身的改动。</p>
     <p><b>怎么核对：</b>图里每个节点都能点开看 <code>path:line</code> 来源；标「源码确证」的是直接读到的代码，标「推算」的是由代码常量算出来的量（例如 PWM 频率）。</p>
