@@ -163,6 +163,7 @@
       <li><a href="#data">⑤ 数据结构</a></li>
       <li><a href="#call">⑥ 函数调用链</a></li>
       <li><a href="#layer">⑦ 分层架构</a></li>
+      <li><a href="#port">附 移植/改功能</a></li>
     </ul>
   </nav>
 
@@ -194,6 +195,7 @@
       <li><b>⑤ 数据结构</b>：7 个跨层结构体撑起数据流，附 12 个 PID 的实际增益表。</li>
       <li><b>⑥ 函数调用链</b>：一条链从 Task_2ms 追到 TIM2-&gt;CCR1，看清每层只碰自己的东西。</li>
       <li><b>⑦ 分层架构</b>：四层边界怎么拼，谁依赖谁、换 MCU 时动哪一层。</li>
+      <li><b>附 移植/改功能</b>：换主控、换传感器、加模式时该动哪一层，以及改完要回归哪些项。</li>
     </ol>
   </section>
 
@@ -451,10 +453,139 @@
     </figure>
   </section>
 
+  <!-- ================= 附：移植与改功能 ================= -->
+  <section id="port">
+    <h2><span class="n">附</span>移植与改功能清单</h2>
+    <p class="sub">换芯片、换传感器、加模式时该动哪一层、别碰什么。所有数值都已按本仓库的代码核对过。</p>
+
+    <h3>移植注意事项</h3>
+    <div class="quick">
+      <article>
+        <h4>换主控芯片</h4>
+        <ul>
+          <li>改 <code>Core/</code> 的时钟、外设初始化与中断</li>
+          <li>改 <code>HALPort/</code>：软 I2C 引脚、串口、DWT 计时</li>
+          <li>换启动文件与链接脚本（FLASH / RAM 大小）</li>
+          <li>控制层不改，只保证结构体与函数签名一致</li>
+        </ul>
+      </article>
+      <article>
+        <h4>换 IMU</h4>
+        <ul>
+          <li>实现 Init / Get_Data / Calibrate 三个接口</li>
+          <li>保持 <code>MPU6050_Data_t</code> 字段与 LSB 量纲</li>
+          <li>校准零偏留在驱动内，姿态解算不感知</li>
+        </ul>
+      </article>
+      <article>
+        <h4>换气压计</h4>
+        <ul>
+          <li>实现 Init(校准系数) / Get_Data(Pa)</li>
+          <li>输出必须是补偿后的气压，单位 Pa</li>
+          <li>解锁瞬间重记零点由高度环负责，驱动不参与</li>
+        </ul>
+      </article>
+      <article>
+        <h4>换光流模块</h4>
+        <ul>
+          <li>串口波特率与帧格式（<code>FE 04 … AA</code>，11 字节）</li>
+          <li>改 <code>Flow_Receive1</code> 的解析与轴映射（<code>loc_x</code> 来自 <code>out_y_i</code>）</li>
+          <li>保持 <code>loc_x</code> / <code>loc_y</code> 输出为 cm</li>
+        </ul>
+      </article>
+      <article>
+        <h4>换遥控链路</h4>
+        <ul>
+          <li>频道、地址、速率要与遥控器一致</li>
+          <li>协议解析输出 10 通道到 <code>Remote_t</code></li>
+          <li>失联计时与保护逻辑可复用</li>
+        </ul>
+      </article>
+      <article>
+        <h4>换电调 / 电机</h4>
+        <ul>
+          <li>TIM 通道、PWM 频率（本工程 18kHz）与占空比范围</li>
+          <li>改混控四路映射与限幅</li>
+          <li>确认 0~1000 的占空比与电调 / 驱动行程匹配</li>
+        </ul>
+      </article>
+      <article>
+        <h4>换 Flash 页</h4>
+        <ul>
+          <li>EEPROM 模拟依赖页大小与起始地址（现用 Page62/63，各 1KB）</li>
+          <li>双页轮换地址按芯片型号修改</li>
+          <li>改完先跑一次 <code>EEPROM_Emu_Format()</code></li>
+        </ul>
+      </article>
+      <article>
+        <h4>移植检查清单</h4>
+        <ul>
+          <li>能解锁，遥控帧与遥测正常</li>
+          <li>地面推油门，四路输出正确</li>
+          <li>定高不漂，失联能缓降并上锁</li>
+        </ul>
+      </article>
+    </div>
+
+    <h3>加功能 / 改功能注意</h3>
+    <div class="quick">
+      <article>
+        <h4>加一个新传感器</h4>
+        <ul>
+          <li>驱动层加文件，HALPort 加端口初始化</li>
+          <li>小模块只做解析与融合，保持结构体接口（如 <code>Flow_t</code>）</li>
+          <li>大模块消费数据，最后在 Scheduler 挂节拍</li>
+          <li>不要在 Control 里直接读寄存器</li>
+        </ul>
+      </article>
+      <article>
+        <h4>加一个新飞行模式</h4>
+        <ul>
+          <li><code>control_mode.c</code> 加 AUX 分支与 10 拍去抖（<code>CONTROL_MODE_DEBOUNCE</code>）</li>
+          <li>复用现有 PID 与混控，不复制控制代码</li>
+          <li>检查解锁 / 上锁与失联缓降路径是否仍成立</li>
+          <li>遥测模式位与 LED 提示同步改</li>
+        </ul>
+      </article>
+      <article>
+        <h4>改 PID 参数</h4>
+        <ul>
+          <li>只改 <code>control.c</code> 默认值，或走 0x10~0x12 在线调参</li>
+          <li>不要在别处散落魔数</li>
+          <li>改完写回 Flash，验证上电加载</li>
+          <li>一次只改一组，改完看阶跃响应</li>
+        </ul>
+      </article>
+      <article>
+        <h4>改节拍 / 加任务</h4>
+        <ul>
+          <li>在 <code>Scheduler_Run</code> 加计数器与派发，先估算单拍耗时</li>
+          <li>2ms 拍只放轻量工作，重活放 10ms / 50ms</li>
+          <li>加完用 1s 打印核对实际耗时</li>
+        </ul>
+      </article>
+      <article>
+        <h4>改协议 / 遥测</h4>
+        <ul>
+          <li>帧头、SUM 校验与上位机保持一致，新帧用未占用功能字</li>
+          <li>0x10~0x15 的 PID 组映射不要随意改（0x13~0x15 不落 Flash）</li>
+        </ul>
+      </article>
+      <article>
+        <h4>改完的回归清单</h4>
+        <ul>
+          <li>地面解锁 / 上锁正常，四路输出符号正确</li>
+          <li>定高、定点、失联缓降各测一次</li>
+          <li>复位后参数仍能加载</li>
+        </ul>
+      </article>
+    </div>
+  </section>
+
   </main>
 
   <footer class="foot">
-    <p class="build"><b>构建标记：</b><code>2026-11-19 13:37 · v4-diagrams</code> · 这一行就是版本凭证——如果你打开的页面底部看不到它，说明看的是旧文件或浏览器缓存，按 Ctrl+F5（手机：下拉刷新）强制刷新即可。</p>
+    <p class="build"><b>构建标记：</b><code>2026-11-19 13:38 · v5-migration</code> · 这一行就是版本凭证——如果你打开的页面底部看不到它，说明看的是旧文件或浏览器缓存，按 Ctrl+F5（手机：下拉刷新）强制刷新即可。</p>
     <p><b>图怎么来的：</b>每张图都是 Archify 生成的独立 HTML，以 <code>data:text/html;base64</code> 内嵌在本页里（除第一张外均为 <code>loading="lazy"</code>），所以整页离线可看、不请求任何外部资源。</p>
     <p><b>图内 revision：</b><code>3d0522b</code>（导入源码的基线提交）。页面文件本身在之后的提交里，因此页面所在 commit 会与图内 revision 不同——图描述的是那份源码，不是页面自身的改动。</p>
     <p><b>怎么核对：</b>图里每个节点都能点开看 <code>path:line</code> 来源；标「源码确证」的是直接读到的代码，标「推算」的是由代码常量算出来的量（例如 PWM 频率）。</p>
