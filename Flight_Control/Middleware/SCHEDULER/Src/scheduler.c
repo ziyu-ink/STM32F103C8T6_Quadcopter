@@ -237,7 +237,7 @@ static void Task_1000ms(void)
     Remote_Ssi_Latch();
     Flow_Update_Link_Status();
 
-    printf("bat=%umV thr=%d p=%.1f roll=%.1f pitch=%.1f yaw=%.1f accz=%.1f accm=%.1f flow=%u loc=%.2f,%.2f unlock=%u rf=%u tt=%d hout=%.1f hl=%u dsc=%u dthr=%d\r\n", Battery_Get_Voltage_mV(), Remote.thrust, s_p, s_angle.roll, s_angle.pitch, s_angle.yaw, IMU_Get_AccZ(), IMU_Get_AccZ_Throw(&s_mpu), Flow_Get_Ssi(), Flow_Pixel.loc_x, Flow_Pixel.loc_y, Remote_Is_Unlocked(), Remote_Get_Ssi(), Control.thr_temp, Control.pid_height_rate.out, Control.height_lock, Control.descent_active, Control.descent_thr);
+    printf("bat=%umV thr=%d p=%.1f t=%.1f roll=%.1f pitch=%.1f yaw=%.1f accz=%.1f accm=%.1f flow=%u loc=%.2f,%.2f unlock=%u rf=%u tt=%d hout=%.1f hl=%u dsc=%u dthr=%d\r\n", Battery_Get_Voltage_mV(), Remote.thrust, s_p, s_t, s_angle.roll, s_angle.pitch, s_angle.yaw, IMU_Get_AccZ(), IMU_Get_AccZ_Throw(&s_mpu), Flow_Get_Ssi(), Flow_Pixel.loc_x, Flow_Pixel.loc_y, Remote_Is_Unlocked(), Remote_Get_Ssi(), Control.thr_temp, Control.pid_height_rate.out, Control.height_lock, Control.descent_active, Control.descent_thr);
 }
 
 /* Scheduler_Init：计数器清零 + 取起始节拍时刻 */
