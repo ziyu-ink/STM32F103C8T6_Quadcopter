@@ -184,6 +184,7 @@
       <div><dt>传感器</dt><dd>MPU6050（软件 I2C，PB6/PB7，333Hz，±2000°/s、±4g）、SPL06 气压计、PMW3901 光流、电池分压进 ADC1+DMA</dd></div>
       <div><dt>参数存储</dt><dd>内部 Flash 末两页（Page62/63）模拟 EEPROM，24 个 uint16 槽位存 8 组 PID，掉电重启后加载</dd></div>
       <div><dt>代码规模</dt><dd>应用代码 87 个 <code>.c/.h</code>，10,606 行（不含 ST HAL 与 CMSIS）</dd></div>
+      <div><dt>资源占用（Debug 实测）</dt><dd>FLASH <b>59,636 B / 64 KB（91.0%）</b>，RAM <b>4,128 B / 20 KB（20.2%）</b>；Flash 只剩约 5.9 KB，加功能前先算空间</dd></div>
       <div><dt>对应提交</dt><dd><code>3d0522b</code>（源码基线）。图内 meta 指向这个 revision，页面本身在其之后的提交里</dd></div>
     </dl>
 
@@ -536,6 +537,7 @@
           <li>改 <code>Core/</code> 的时钟、外设初始化与中断</li>
           <li>改 <code>HALPort/</code>：软 I2C 引脚、串口、DWT 计时</li>
           <li>换启动文件与链接脚本（FLASH / RAM 大小）</li>
+          <li>本芯片 64 KB Flash 已用 91%，换型号时优先挑 Flash 更大的</li>
           <li>控制层不改，只保证结构体与函数签名一致</li>
         </ul>
       </article>
@@ -655,7 +657,7 @@
   </main>
 
   <footer class="foot">
-    <p class="build"><b>构建标记：</b><code>2026-11-19 14:23 · v1</code> · 这一行就是版本凭证——如果你打开的页面底部看不到它，说明看的是旧文件或浏览器缓存，按 Ctrl+F5（手机：下拉刷新）强制刷新即可。</p>
+    <p class="build"><b>构建标记：</b><code>2026-11-19 14:24 · v1</code> · 这一行就是版本凭证——如果你打开的页面底部看不到它，说明看的是旧文件或浏览器缓存，按 Ctrl+F5（手机：下拉刷新）强制刷新即可。</p>
     <p><b>图怎么来的：</b>每张图都是 Archify 生成的独立 HTML，以 <code>data:text/html;base64</code> 内嵌在本页里（除第一张外均为 <code>loading="lazy"</code>），所以整页离线可看、不请求任何外部资源。</p>
     <p><b>图内 revision：</b><code>3d0522b</code>（导入源码的基线提交）。页面文件本身在之后的提交里，因此页面所在 commit 会与图内 revision 不同——图描述的是那份源码，不是页面自身的改动。</p>
     <p><b>怎么核对：</b>图里每个节点都能点开看 <code>path:line</code> 来源；标「源码确证」的是直接读到的代码，标「推算」的是由代码常量算出来的量（例如 PWM 频率）。</p>
