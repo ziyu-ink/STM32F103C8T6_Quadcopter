@@ -7,7 +7,10 @@
 <title>STM32F103C8T6 四轴飞控 · 代码可视化文档</title>
 <style>
   *,*::before,*::after{box-sizing:border-box}
-  html,body{overflow-x:hidden}
+  /* 横向绝不溢出，但不用 overflow:hidden 制造滚动容器（iOS 下会干扰 sticky 与滚动位置） */
+  html{overflow-x:clip}
+  body{overflow-x:clip}
+  @supports not (overflow:clip){ html,body{overflow-x:hidden} }
   html{-webkit-text-size-adjust:100%}
   :root{
     --bg:#0a0e13; --panel:#0f151d; --line:#1b2734; --line2:#16212c;
@@ -117,7 +120,7 @@
     iframe{height:64vh}
   }
   @media (prefers-reduced-motion:no-preference){
-    html{scroll-behavior:smooth}
+    nav ul{scroll-behavior:smooth}
   }
 </style>
 </head>
@@ -391,21 +394,53 @@
 </div>
 
 <script>
-  // 导航高亮：只做轻微提示，不依赖外部库
+  // 导航高亮：被动监听滚动，只改 class 与导航自身的横向位置。
+  // 不调用 scrollIntoView / scrollTo，绝不碰文档的滚动位置。
   (function () {
+    var nav = document.querySelector('nav ul');
     var links = Array.prototype.slice.call(document.querySelectorAll('nav a'));
-    var map = {};
-    links.forEach(function (a) { map[a.getAttribute('href').slice(1)] = a; });
-    if (!('IntersectionObserver' in window)) return;
-    var io = new IntersectionObserver(function (entries) {
-      entries.forEach(function (e) {
-        if (!e.isIntersecting) return;
-        links.forEach(function (a) { a.classList.remove('on'); });
-        var a = map[e.target.id];
-        if (a) { a.classList.add('on'); a.scrollIntoView({ block: 'nearest', inline: 'center' }); }
-      });
-    }, { rootMargin: '-45% 0px -50% 0px' });
-    document.querySelectorAll('main section').forEach(function (s) { io.observe(s); });
+    var sections = Array.prototype.slice.call(document.querySelectorAll('main section'));
+    if (!nav || !links.length || !sections.length) return;
+
+    var byId = {};
+    links.forEach(function (a) { byId[a.getAttribute('href').slice(1)] = a; });
+
+    var ticking = false;
+    var current = null;
+
+    function centreLink(a) {
+      var lr = a.getBoundingClientRect();
+      var nr = nav.getBoundingClientRect();
+      var delta = (lr.left + lr.width / 2) - (nr.left + nr.width / 2);
+      if (Math.abs(delta) < 8) return;
+      nav.scrollLeft += delta;   // 只动导航条自己的横向滚动
+    }
+
+    function update() {
+      ticking = false;
+      var probe = window.innerHeight * 0.35;   // 以视口 35% 处作为判定线
+      var best = sections[0];
+      for (var i = 0; i < sections.length; i++) {
+        var top = sections[i].getBoundingClientRect().top;
+        if (top - probe <= 0) best = sections[i];
+      }
+      var a = byId[best.id];
+      if (!a || a === current) return;
+      current = a;
+      links.forEach(function (x) { x.classList.remove('on'); });
+      a.classList.add('on');
+      centreLink(a);
+    }
+
+    function request() {
+      if (ticking) return;
+      ticking = true;
+      setTimeout(update, 60);   // 不用 rAF：后台标签页/无头环境里 rAF 可能被暂停
+    }
+
+    window.addEventListener('scroll', request, { passive: true });
+    window.addEventListener('resize', request, { passive: true });
+    update();
   })();
 </script>
 </body>
