@@ -204,38 +204,21 @@ void Control_Height_Update(float dt)
     static int16_t s_acc_offset = 0; // s_acc_offset：加速度零点
     static float s_thr_hold = 0.0f; // s_thr_hold：进入定高时油门
     static float s_last_high = 0.0f; // s_last_high：上拍高度(cm)
-    static uint8_t s_set_high = 0, s_break_cnt = 0, s_bara_off = 0; // 重锚标志/杆偏计数/气压关闭
+    static uint8_t s_set_high = 0, s_break_cnt = 0; // 重锚标志/杆偏计数
 
     if (dt < 0.000001f)
     {
         dt = 0.000001f;
     }
 
-    /* 手势开关：右下角关气压，左下角开 */
-    if (Remote.thrust < 1200 && Remote.yaw > 1800 && Remote.roll < 1200 && Remote.pitch > 1800)
+    /* 高度源选择：窗口内光流优先，否则气压 */
+    if (Flow.ok && (Flow.flow_High > CONTROL_FLOW_HIGH_MIN_MM) && (Flow.flow_High < (float)CONTROL_FLOW_HIGH_VALID_MM))
     {
-        s_bara_off = 1;
-    }
-    if (Remote.thrust < 1200 && Remote.yaw > 1800 && Remote.roll < 1200 && Remote.pitch < 1200)
-    {
-        s_bara_off = 0;
-    }
-
-    if (!s_bara_off)
-    {
-        /* 高度源选择：窗口内光流优先，否则气压 */
-        if (Flow.ok && (Flow.flow_High > CONTROL_FLOW_HIGH_MIN_MM) && (Flow.flow_High < (float)CONTROL_FLOW_HIGH_VALID_MM))
-        {
-            Control.control_high = Flow.flow_High / 10.0f;
-        }
-        else
-        {
-            Control.control_high = Control.baro_height;
-        }
+        Control.control_high = Flow.flow_High / 10.0f;
     }
     else
     {
-        Control.control_high = 0.0f;
+        Control.control_high = Control.baro_height;
     }
 
     /* slew 限幅：高度每拍最多 ±3cm */
