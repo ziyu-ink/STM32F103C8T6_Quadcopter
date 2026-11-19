@@ -230,7 +230,9 @@ static void Task_50ms(void)
  * @retval 无
  * @note   Remote_Ssi_Latch 锁存上一秒遥控有效帧数；Flow_Update_Link_Status
  *         统计光流有效帧数；printf 输出关键状态供地面观察，其中 rc=R,P,Y 是
- *         遥控器横滚/俯仰/偏航三通道的原始值（1000~2000），松杆时应为 1500。
+ *         遥控器横滚/俯仰/偏航三通道的原始值（1000~2000），松杆时应为 1500；
+ *         h 是控制采用的相对高度（cm，光流高度优先，否则气压），bh 是融合后
+ *         的气压高度（cm）。
  */
 static void Task_1000ms(void)
 {
@@ -238,7 +240,7 @@ static void Task_1000ms(void)
     Remote_Ssi_Latch();
     Flow_Update_Link_Status();
 
-    printf("bat=%umV rc=%d,%d,%d thr=%d p=%.1f t=%.1f roll=%.1f pitch=%.1f yaw=%.1f accz=%.1f accm=%.1f flow=%u loc=%.2f,%.2f unlock=%u rf=%u tt=%d hout=%.1f hl=%u dsc=%u dthr=%d\r\n", Battery_Get_Voltage_mV(), Remote.roll, Remote.pitch, Remote.yaw, Remote.thrust, s_p, s_t, s_angle.roll, s_angle.pitch, s_angle.yaw, IMU_Get_AccZ(), IMU_Get_AccZ_Throw(&s_mpu), Flow_Get_Ssi(), Flow_Pixel.loc_x, Flow_Pixel.loc_y, Remote_Is_Unlocked(), Remote_Get_Ssi(), Control.thr_temp, Control.pid_height_rate.out, Control.height_lock, Control.descent_active, Control.descent_thr);
+    printf("bat=%umV rc=%d,%d,%d thr=%d p=%.1f t=%.1f h=%.1f bh=%.1f roll=%.1f pitch=%.1f yaw=%.1f accz=%.1f accm=%.1f flow=%u loc=%.2f,%.2f unlock=%u rf=%u tt=%d hout=%.1f hl=%u dsc=%u dthr=%d\r\n", Battery_Get_Voltage_mV(), Remote.roll, Remote.pitch, Remote.yaw, Remote.thrust, s_p, s_t, Control.control_high, Control.baro_height, s_angle.roll, s_angle.pitch, s_angle.yaw, IMU_Get_AccZ(), IMU_Get_AccZ_Throw(&s_mpu), Flow_Get_Ssi(), Flow_Pixel.loc_x, Flow_Pixel.loc_y, Remote_Is_Unlocked(), Remote_Get_Ssi(), Control.thr_temp, Control.pid_height_rate.out, Control.height_lock, Control.descent_active, Control.descent_thr);
 }
 
 /* Scheduler_Init：计数器清零 + 取起始节拍时刻 */
