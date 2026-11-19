@@ -1,0 +1,11 @@
+# Build output (CMake / STM32CubeMX)
+build/
+Flight_Control/build/
+mx.scratch
+
+# Archify working directory (diagram candidates + review evidence)
+.archify/
+
+# OS cruft
+Thumbs.db
+desktop.ini
