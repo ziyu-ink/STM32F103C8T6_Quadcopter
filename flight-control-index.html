@@ -163,7 +163,7 @@
       <li><a href="#data">⑤ 数据结构</a></li>
       <li><a href="#call">⑥ 函数调用链</a></li>
       <li><a href="#layer">⑦ 分层架构</a></li>
-      <li><a href="#glossary">附 术语/误解</a></li>
+      <li><a href="#glossary">附 术语/误解/算法</a></li>
       <li><a href="#port">附 移植/改功能</a></li>
     </ul>
   </nav>
@@ -199,7 +199,7 @@
       <li><b>⑤ 数据结构</b>：7 个跨层结构体撑起数据流，附 12 个 PID 的实际增益表。</li>
       <li><b>⑥ 函数调用链</b>：一条链从 Task_2ms 追到 TIM2-&gt;CCR1，看清每层只碰自己的东西。</li>
       <li><b>⑦ 分层架构</b>：四层边界怎么拼，谁依赖谁、换 MCU 时动哪一层。</li>
-      <li><b>附 术语/误解</b>：缩写表，以及九条“看着像写错、其实是有意为之”的地方。</li>
+      <li><b>附 术语/误解/算法</b>：缩写表、九条“看着像写错、其实是有意为之”的地方，以及“想学某个算法该看哪个文件”。</li>
       <li><b>附 移植/改功能</b>：换主控、换传感器、加模式时该动哪一层，以及改完要回归哪些项。</li>
     </ol>
   </section>
@@ -498,8 +498,8 @@
 
   <!-- ================= 附：术语与常见误解 ================= -->
   <section id="glossary">
-    <h2><span class="n">附</span>术语与常见误解</h2>
-    <p class="sub">读代码时最容易卡住的两件事：缩写不知道指什么，以及“看起来像写错了”其实是有意为之。</p>
+    <h2><span class="n">附</span>术语 · 误解 · 算法</h2>
+    <p class="sub">读代码时最容易卡住的三件事：缩写不知道指什么、“看起来像写错了”其实是有意为之、以及“这个算法在哪”。</p>
 
     <h3>术语表</h3>
     <div class="tablewrap">
@@ -548,6 +548,28 @@
       <li><b>“IMU 的 dt 随便填”</b> —— 它直接乘进四元数积分和 yaw 积分，改周期必须同步改它。</li>
       <li><b>“电调是 1000~2000 微秒”</b> —— 本工程是 18kHz、占空比 0~1000，不是标准电调脉宽。</li>
     </ol>
+
+    <h3>算法索引：想学某个算法，去哪个文件</h3>
+    <p class="sub">每个模块实际用到的算法，照这张表按需去读，不必通读全项目。</p>
+    <div class="tablewrap">
+      <table>
+        <caption>按模块列出“用了什么算法”（对应 xmind 里每个节点的备注）</caption>
+        <thead><tr><th>模块</th><th>用到的算法 / 方法</th></tr></thead>
+        <tbody>
+          <tr><td><code>KALMAN_FILTER</code></td><td>标量卡尔曼：预测协方差 → 增益 → 状态更新 → 后验协方差（无 FPU 友好的标量实现）</td></tr>
+          <tr><td><code>PID</code></td><td>位置式 PID（离散化）、串级 PID</td></tr>
+          <tr><td><code>FILTER</code></td><td>增量式滑动平均、泄漏积分器</td></tr>
+          <tr><td><code>MY_MATH</code></td><td>正弦 / 余弦近似、反正切与反正弦泰勒级数、<code>Safe_Asin</code> 钳位、快速平方根倒数</td></tr>
+          <tr><td><code>IMU</code></td><td>四元数微分方程、Mahony 互补滤波、一阶欧拉积分、四元数归一化、陀螺积分、叉积误差</td></tr>
+          <tr><td><code>MPU6050</code></td><td>加速度计一维卡尔曼（Q=0.001、R=0.543）、陀螺一阶低通 α=0.15、14 字节大端拼接</td></tr>
+          <tr><td><code>FLOW</code></td><td>姿态补偿（去倾斜伪位移）、两级低通 + 差分测速、像素→厘米换算</td></tr>
+          <tr><td><code>control_height</code></td><td>误差反馈积分融合器（Luenberger 观测器内核）、互补滤波</td></tr>
+          <tr><td><code>control_mixer</code></td><td>X 型四轴混控矩阵</td></tr>
+          <tr><td><code>BATTERY</code></td><td>一阶低通 0.2 + 迟滞 / 消抖</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="sub">卡尔曼入门可看 <a href="https://www.bilibili.com/video/BV1ez4y1X7eR" target="_blank" rel="noopener noreferrer">【卡尔曼滤波器】1 递归算法</a>（设计说明里记的同一个链接）。</p>
   </section>
 
   <!-- ================= 附：移植与改功能 ================= -->
@@ -683,7 +705,7 @@
   </main>
 
   <footer class="foot">
-    <p class="build"><b>构建标记：</b><code>2026-11-19 15:22 · v1</code> · 这一行就是版本凭证——如果你打开的页面底部看不到它，说明看的是旧文件或浏览器缓存，按 Ctrl+F5（手机：下拉刷新）强制刷新即可。</p>
+    <p class="build"><b>构建标记：</b><code>2026-11-19 15:40 · v1</code> · 这一行就是版本凭证——如果你打开的页面底部看不到它，说明看的是旧文件或浏览器缓存，按 Ctrl+F5（手机：下拉刷新）强制刷新即可。</p>
     <p><b>图怎么来的：</b>每张图都是 Archify 生成的独立 HTML，以 <code>data:text/html;base64</code> 内嵌在本页里（除第一张外均为 <code>loading="lazy"</code>），所以整页离线可看、不请求任何外部资源。</p>
     <p><b>图内 revision：</b><code>3d0522b</code>（导入源码的基线提交）。页面文件本身在之后的提交里，因此页面所在 commit 会与图内 revision 不同——图描述的是那份源码，不是页面自身的改动。</p>
     <p><b>怎么核对：</b>图里每个节点都能点开看 <code>path:line</code> 来源；标「源码确证」的是直接读到的代码，标「推算」的是由代码常量算出来的量（例如 PWM 频率）。</p>
