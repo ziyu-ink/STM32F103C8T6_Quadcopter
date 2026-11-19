@@ -4,7 +4,16 @@
 #include "my_math.h"
 #include <math.h>
 
-static uint8_t s_att_status = CONTROL_STATUS_WAITING_1; // s_att_status：姿态状态机状态
+/* 姿态状态机：IDLE 等解锁 → RESET 复位 PID → RUN 正式控制 → EXIT 退出回锁 */
+typedef enum
+{
+    ATT_IDLE = 0,  // 等待解锁
+    ATT_RESET,     // 解锁后复位 8 个 PID（本拍不输出）
+    ATT_RUN,       // 正式控制：稳态跑串级 PID
+    ATT_EXIT       // 退出并回锁
+} Att_State_t;
+
+static uint8_t s_att_status = ATT_IDLE; // s_att_status：姿态状态机状态
 
 // s_pid_obj：解锁时需复位的 8 个 PID 表
 static PID_Object_t *s_pid_obj[] =
@@ -24,15 +33,15 @@ void Control_Attitude_Update(MPU6050_Data_t *pMpu, IMU_Angle_t *pAngle, float dt
 {
     switch (s_att_status)
     {
-        case CONTROL_STATUS_WAITING_1:
+        case ATT_IDLE:
             /* 等待遥控解锁 */
             if (Remote_Is_Unlocked())
             {
-                s_att_status = CONTROL_STATUS_READY_11;
+                s_att_status = ATT_RESET;
             }
             break;
 
-        case CONTROL_STATUS_READY_11:
+        case ATT_RESET:
             /* 复位 8 个 PID + 航向基准清零 */
             PID_Reset(s_pid_obj, 8);
 
@@ -40,10 +49,10 @@ void Control_Attitude_Update(MPU6050_Data_t *pMpu, IMU_Angle_t *pAngle, float dt
             Control.pid_yaw.desired = 0.0f;
             Control.pid_yaw.measured = 0.0f;
 
-            s_att_status = CONTROL_STATUS_PROCESS_31;
+            s_att_status = ATT_RUN;
             break;
 
-        case CONTROL_STATUS_PROCESS_31:
+        case ATT_RUN:
             /* 更新反馈：陀螺进角速度环，姿态角进角度环 */
             Control.pid_rate_x.measured = (float)pMpu->gx * Gyro_G;
             Control.pid_rate_y.measured = (float)pMpu->gy * Gyro_G;
@@ -73,18 +82,18 @@ void Control_Attitude_Update(MPU6050_Data_t *pMpu, IMU_Angle_t *pAngle, float dt
             PID_Cascade(&Control.pid_rate_z, &Control.pid_yaw, dt);
             break;
 
-        case CONTROL_STATUS_EXIT_255:
+        case ATT_EXIT:
             PID_Reset(s_pid_obj, 8);
-            s_att_status = CONTROL_STATUS_WAITING_1;
+            s_att_status = ATT_IDLE;
             break;
 
         default:
-            s_att_status = CONTROL_STATUS_EXIT_255;
+            s_att_status = ATT_EXIT;
             break;
     }
     if (!Remote_Is_Unlocked())
     {
-        s_att_status = CONTROL_STATUS_EXIT_255;
+        s_att_status = ATT_EXIT;
     }
 }
 

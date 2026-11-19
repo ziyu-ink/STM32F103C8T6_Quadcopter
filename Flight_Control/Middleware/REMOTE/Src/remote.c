@@ -3,12 +3,16 @@
 #include "my_math.h"
 #include <stdint.h>
 
-#define REMOTE_STATUS_WAITING_1 1 // 等待解锁：油门拉到最低
-#define REMOTE_STATUS_WAITING_2 2 // 等待解锁：油门拉到最高并保持
-#define REMOTE_STATUS_WAITINF_3 3 // 等待解锁：油门再拉到最低
-#define REMOTE_STATUS_WAITINF_4 4 // 解锁成功：置解锁标志
-#define REMOTE_STATUS_PROCESS_31 31 // 解锁中：油门最低持续
-#define REMOTE_STATUS_EXIT_255 255 // 退出状态机
+/* 解锁状态机：IDLE 等油门拉低 → WAIT_HIGH 等拉高保持 → WAIT_LOW 再拉低 → ARM 置解锁 → RUN → EXIT */
+typedef enum
+{
+    RMT_IDLE = 0,   // 等待解锁：油门拉到最低
+    RMT_WAIT_HIGH,  // 等待解锁：油门拉到最高并保持 6 拍
+    RMT_WAIT_LOW,   // 等待解锁：油门再拉到最低（同时请求气压清零）
+    RMT_ARM,        // 解锁成功：置解锁标志
+    RMT_RUN,        // 解锁中：油门最低持续超 20s 自动上锁
+    RMT_EXIT        // 退出：回锁并回等待态
+} Rmt_State_t;
 
 #define REMOTE_LOST_TICKS 300 // 失连门限：300 × 10(ms) = 3s
 #define REMOTE_LINK_VALID_TICKS 200 // 链路有效窗口：200 × 10(ms)= 2s，超时即回中并停止用残留通道值
@@ -40,10 +44,10 @@
 static uint16_t s_lost_cnt = 0; // 失联计时：每 10(ms) + 1,收到合法帧清零
 static uint8_t s_link_lost = 1; // 链路丢失标志：上电默认丢失（慢闪等遥控），收到合法帧清零，超时置位
 static uint8_t s_failsafe = 0; // 失联保护标志：曾连接且失联满 3s 置位，只有收到合法帧才解除（不随收尾清零）
-static uint16_t s_lock_cnt = 0; // PROCESS_31 内“油门最低持续”计时
-static uint8_t s_arm_cnt = 0; // WAITING_2 内高油门计数
+static uint16_t s_lock_cnt = 0; // RMT_RUN 内“油门最低持续”计时
+static uint8_t s_arm_cnt = 0; // RMT_WAIT_HIGH 内高油门计数
 static uint8_t s_thr_step = 0; // 失联降油门的节拍计数
-static uint8_t s_status = REMOTE_STATUS_WAITING_1; // 状态机初始态
+static uint8_t s_status = RMT_IDLE; // 状态机初始态
 static uint8_t s_unlock = 0; // 1 = 已解锁
 static float s_yaw_trim = 0; // 本拍偏航微调增量
 static uint8_t s_baro_zero_req = 0; // 气压清零请求（一次事件）
@@ -58,20 +62,20 @@ static void Remote_Unlock_Fsm(void)
     /* 右下角上锁手势：任意状态立即上锁 */
     if (Remote.thrust < REMOTE_LOCK_THR && Remote.yaw > REMOTE_LOCK_YAW)
     {
-        s_status = REMOTE_STATUS_EXIT_255;
+        s_status = RMT_EXIT;
     }
 
     switch (s_status)
     {
-        case REMOTE_STATUS_WAITING_1:
+        case RMT_IDLE:
             /* 等油门拉到最低 */
             if (Remote.thrust < REMOTE_ARM_LOW)
             {
-                s_status = REMOTE_STATUS_WAITING_2;
+                s_status = RMT_WAIT_HIGH;
             }
             break;
 
-        case REMOTE_STATUS_WAITING_2:
+        case RMT_WAIT_HIGH:
             /* 等油门拉到最高并保持 6 拍 */
             if (Remote.thrust > REMOTE_ARM_HIGH)
             {
@@ -79,38 +83,38 @@ static void Remote_Unlock_Fsm(void)
                 if (s_arm_cnt > REMOTE_ARM_HOLD_CNT)
                 {
                     s_arm_cnt = 0;
-                    s_status = REMOTE_STATUS_WAITINF_3;
+                    s_status = RMT_WAIT_LOW;
                 }
             }
             break;
 
-        case REMOTE_STATUS_WAITINF_3:
+        case RMT_WAIT_LOW:
             /* 再拉最低：请求气压清零 */
             if (Remote.thrust < REMOTE_ARM_LOW)
             {
                 s_baro_zero_req = 1;
-                s_status = REMOTE_STATUS_WAITINF_4;
+                s_status = RMT_ARM;
             }
             break;
 
-        case REMOTE_STATUS_WAITINF_4:
+        case RMT_ARM:
             /* 解锁成功 */
             s_unlock = 1;
-            s_status = REMOTE_STATUS_PROCESS_31;
+            s_status = RMT_RUN;
             break;
 
-        case REMOTE_STATUS_PROCESS_31:
+        case RMT_RUN:
             /* 解锁中：油门最低超 20s 自动上锁 */
             if (Remote.thrust < REMOTE_AUTO_LOCK_THR)
             {
                 if (s_lock_cnt++ > REMOTE_AUTO_LOCK_CNT)
                 {
-                    s_status = REMOTE_STATUS_EXIT_255;
+                    s_status = RMT_EXIT;
                 }
             }
             else if (!s_unlock)
             {
-                s_status = REMOTE_STATUS_EXIT_255;
+                s_status = RMT_EXIT;
             }
             else
             {
@@ -118,15 +122,15 @@ static void Remote_Unlock_Fsm(void)
             }
             break;
 
-        case REMOTE_STATUS_EXIT_255:
+        case RMT_EXIT:
             /* 退出：回锁并回等待态 */
             s_lock_cnt = 0;
             s_unlock = 0;
-            s_status = REMOTE_STATUS_WAITING_1;
+            s_status = RMT_IDLE;
             break;
 
         default:
-            s_status = REMOTE_STATUS_EXIT_255;
+            s_status = RMT_EXIT;
             break;
     }
 }

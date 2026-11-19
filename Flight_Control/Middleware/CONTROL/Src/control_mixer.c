@@ -4,7 +4,16 @@
 #include "my_math.h"
 #include "motor.h"
 
-static uint8_t s_mix_status = CONTROL_STATUS_WAITING_1; // s_mix_status：混控状态机状态
+/* 混控状态机：IDLE 等解锁 → ARMED 等油门过阈 → RUN 正常输出 → EXIT 停机 */
+typedef enum
+{
+    MIX_IDLE = 0,  // 等待解锁
+    MIX_ARMED,     // 已解锁，等油门 > CONTROL_ARM_THR 或起飞/抛飞触发
+    MIX_RUN,       // 正常混控输出
+    MIX_EXIT       // 停机回锁
+} Mix_State_t;
+
+static uint8_t s_mix_status = MIX_IDLE; // s_mix_status：混控状态机状态
 
 /* Control_Mixer_Update：2ms 混控状态机，无入参无返回 */
 void Control_Mixer_Update(void)
@@ -14,21 +23,21 @@ void Control_Mixer_Update(void)
 
     switch (s_mix_status)
     {
-        case CONTROL_STATUS_WAITING_1:
+        case MIX_IDLE:
             m1 = m2 = m3 = m4 = 0;
             if (Remote_Is_Unlocked())
             {
-                s_mix_status = CONTROL_STATUS_WAITING_2;
+                s_mix_status = MIX_ARMED;
             }
 
-        case CONTROL_STATUS_WAITING_2:
+        case MIX_ARMED:
             if (Remote.thrust > CONTROL_ARM_THR || Control.takeoff == 1 || Control.throw_active == 1)
             {
-                s_mix_status = CONTROL_STATUS_PROCESS_31;
+                s_mix_status = MIX_RUN;
             }
             break;
 
-        case CONTROL_STATUS_PROCESS_31:
+        case MIX_RUN:
         {
             float thr_cmd = 0.0f; // thr_cmd：本拍油门指令
 
@@ -65,9 +74,9 @@ void Control_Mixer_Update(void)
             break;
         }
 
-        case CONTROL_STATUS_EXIT_255:
+        case MIX_EXIT:
             m1 = m2 = m3 = m4 = 0;
-            s_mix_status = CONTROL_STATUS_WAITING_1;
+            s_mix_status = MIX_IDLE;
             break;
 
         default:
@@ -76,7 +85,7 @@ void Control_Mixer_Update(void)
 
     if (!Remote_Is_Unlocked())
     {
-        s_mix_status = CONTROL_STATUS_EXIT_255;
+        s_mix_status = MIX_EXIT;
     }
 
     /* 四路限幅 [0,1000] 后写 PWM */

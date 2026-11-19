@@ -4,12 +4,13 @@
 #include "pid.h"
 #include "imu.h"
 
-// DESC_STATE_IDLE：状态-空闲
-#define DESC_STATE_IDLE 0
-// DESC_STATE_ACTIVE：状态-缓降中
-#define DESC_STATE_ACTIVE 1
-// DESC_STATE_DONE：状态-完成
-#define DESC_STATE_DONE 2
+/* 缓降状态机：IDLE 空闲 → ACTIVE 缓降中 → DONE 完成（已上锁） */
+typedef enum
+{
+    DESC_IDLE = 0,  // 空闲
+    DESC_ACTIVE,    // 缓降中
+    DESC_DONE       // 完成：已触地或超时并上锁
+} Desc_State_t;
 
 // DESC_ENTER_CM：进入缓降最低高度(cm)
 #define DESC_ENTER_CM 20.0f
@@ -40,7 +41,7 @@
 // DESC_INTEG_LIMIT：积分限幅
 #define DESC_INTEG_LIMIT 400.0f
 
-static uint8_t s_state = DESC_STATE_IDLE; // s_state：缓降状态
+static uint8_t s_state = DESC_IDLE; // s_state：缓降状态
 static uint8_t s_angle_cnt = 0; // s_angle_cnt：角度超限计数
 static uint8_t s_touch_cnt = 0; // s_touch_cnt：触地计数
 static uint16_t s_timeout_cnt = 0; // s_timeout_cnt：超时计数
@@ -69,7 +70,7 @@ static void Control_Descent_PID_Init(void)
 /* Control_Descent_Reset：退出缓降并把油门控制权交回遥控时间斜坡，无入参无返回 */
 void Control_Descent_Reset(void)
 {
-    s_state = DESC_STATE_IDLE;
+    s_state = DESC_IDLE;
     s_angle_cnt = 0;
     s_touch_cnt = 0;
     s_timeout_cnt = 0;
@@ -103,7 +104,7 @@ void Control_Descent_Update(const IMU_Angle_t *pAngle, float dt)
     /* 未解锁：复位并清 block */
     if (!Remote_Is_Unlocked())
     {
-        if ((s_state != DESC_STATE_IDLE) || Control.descent_active)
+        if ((s_state != DESC_IDLE) || Control.descent_active)
         {
             Control_Descent_Reset();
         }
@@ -112,7 +113,7 @@ void Control_Descent_Update(const IMU_Angle_t *pAngle, float dt)
     }
 
     /* 失控恢复：自动触发的缓降退出 */
-    if ((s_state == DESC_STATE_ACTIVE) && !s_by_manual && !Remote_Is_Failsafe_Locked())
+    if ((s_state == DESC_ACTIVE) && !s_by_manual && !Remote_Is_Failsafe_Locked())
     {
         s_block = 0;
         Control_Descent_Reset();
@@ -120,7 +121,7 @@ void Control_Descent_Update(const IMU_Angle_t *pAngle, float dt)
     }
 
     /* IDLE：进入条件判定（请求/高度/封锁） */
-    if (s_state == DESC_STATE_IDLE)
+    if (s_state == DESC_IDLE)
     {
         uint8_t by_failsafe; // by_failsafe：1=失联触发
 
@@ -145,7 +146,7 @@ void Control_Descent_Update(const IMU_Angle_t *pAngle, float dt)
         /* 进入动作：初始化 PID 并接管油门 */
         Control_Descent_PID_Init();
         s_pid.measured = Control.pid_height_rate.measured; 
-        s_state = DESC_STATE_ACTIVE;
+        s_state = DESC_ACTIVE;
         s_angle_cnt = 0;
         s_touch_cnt = 0;
         s_timeout_cnt = 0;
@@ -156,7 +157,7 @@ void Control_Descent_Update(const IMU_Angle_t *pAngle, float dt)
         return;
     }
 
-    if (s_state != DESC_STATE_ACTIVE)
+    if (s_state != DESC_ACTIVE)
     {
         return;
     }
@@ -185,7 +186,7 @@ void Control_Descent_Update(const IMU_Angle_t *pAngle, float dt)
         {
             Control.descent_thr = 0;
             Control.descent_active = 0;
-            s_state = DESC_STATE_DONE;
+            s_state = DESC_DONE;
             Remote_Set_Descent_Hold(0);
             Remote_Set_Unlocked(0);
         }
@@ -198,7 +199,7 @@ void Control_Descent_Update(const IMU_Angle_t *pAngle, float dt)
     {
         Control.descent_thr = 0;
         Control.descent_active = 0;
-        s_state = DESC_STATE_DONE;
+        s_state = DESC_DONE;
         Remote_Set_Descent_Hold(0);
         Remote_Set_Unlocked(0);
         return;

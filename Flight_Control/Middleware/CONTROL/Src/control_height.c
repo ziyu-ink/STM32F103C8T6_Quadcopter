@@ -7,6 +7,15 @@
 #include "my_math.h"
 #include <stdint.h>
 
+/* 定高状态机：IDLE 等使能 → READY 记录基准 → RUN 闭环 → EXIT 复位 */
+typedef enum
+{
+    HGT_IDLE = 0,  // 等 height_lock && 已解锁
+    HGT_READY,     // 记录油门保持值并设定 desired
+    HGT_RUN,       // 高度位置环 → 速度环
+    HGT_EXIT       // 复位高度速度环 PID
+} Hgt_State_t;
+
 // CONTROL_HEIGHT_BASE_PRESSURE：基准气压(Pa)
 #define CONTROL_HEIGHT_BASE_PRESSURE 101000.0f
 // CONTROL_HEIGHT_CUBE_K：三次修正系数
@@ -191,7 +200,7 @@ void Control_Height_Calc(float yaw_deg, uint8_t dt_ms)
 /* Control_Height_Update：选源 + 互补滤波 + 四态定高状态机（入 dt，无返回） */
 void Control_Height_Update(float dt)
 {
-    static uint8_t s_status = CONTROL_STATUS_WAITING_1; // s_status：定高状态机状态
+    static uint8_t s_status = HGT_IDLE; // s_status：定高状态机状态
     static int16_t s_acc_offset = 0; // s_acc_offset：加速度零点
     static float s_thr_hold = 0.0f; // s_thr_hold：进入定高时油门
     static float s_last_high = 0.0f; // s_last_high：上拍高度(cm)
@@ -249,21 +258,21 @@ void Control_Height_Update(float dt)
     /* 未解锁或失联：强制退出定高 */
     if (!Remote_Is_Unlocked() || Remote_Is_Link_Lost())
     {
-        s_status = CONTROL_STATUS_EXIT_255;
+        s_status = HGT_EXIT;
     }
 
     /* 四态定高状态机 */
     switch (s_status)
     {
-        case CONTROL_STATUS_WAITING_1:
+        case HGT_IDLE:
             if (Control.height_lock && Remote_Is_Unlocked())
             {
-                s_status = CONTROL_STATUS_WAITING_2;
+                s_status = HGT_READY;
                 s_thr_hold = 0.0f;
             }
             break;
 
-        case CONTROL_STATUS_WAITING_2:
+        case HGT_READY:
             s_thr_hold = (float)(Remote.thrust - 1000);
             s_set_high = 0;
             if (Control.takeoff || Control.throw_active)
@@ -274,10 +283,10 @@ void Control_Height_Update(float dt)
             {
                 Control.pid_height_high.desired = Control.control_high;
             }
-            s_status = CONTROL_STATUS_PROCESS_31;
+            s_status = HGT_RUN;
             break;
 
-        case CONTROL_STATUS_PROCESS_31:
+        case HGT_RUN:
         {
             float thr_off = (float)(Remote.thrust - 1000); // thr_off：油门相对中位偏移
 
@@ -304,21 +313,21 @@ void Control_Height_Update(float dt)
 
             if (!Control.height_lock)
             {
-                s_status = CONTROL_STATUS_EXIT_255;
+                s_status = HGT_EXIT;
             }
             break;
         }
 
-        case CONTROL_STATUS_EXIT_255:
+        case HGT_EXIT:
         {
             PID_Object_t *p[1] = { &Control.pid_height_rate }; // p：待复位 PID 表
             PID_Reset(p, 1);
-            s_status = CONTROL_STATUS_WAITING_1;
+            s_status = HGT_IDLE;
             break;
         }
 
         default:
-            s_status = CONTROL_STATUS_WAITING_1;
+            s_status = HGT_IDLE;
             break;
     }
 }

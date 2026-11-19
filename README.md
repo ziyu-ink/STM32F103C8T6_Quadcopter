@@ -100,15 +100,17 @@ ST HAL + CMSIS → TIMx->CCR / GPIOx->BSRR
 
 - **3 组串级 PID，共 12 个环**：姿态（角度→角速度，6 个）、高度（位置→速度，2 个）、光流定点（位置→速度，4 个）。
 - **`ki` 全为 0**：纯 P / PD，没有积分抗静差；缓降另有一个私有环（`kp=1.0 / ki=0.25 / kd=0`），不在参数表里。
-- **状态机编号**（日志可逐行对照）：
+- **状态机命名**：每个状态机都有自己的枚举，定义在各自的 `.c` 文件里，不再共用一套 1/2/11/31/255 的编号。共同的骨架是 `IDLE → 中间态 → RUN → EXIT`：
 
-| 编号 | 含义 |
-|---|---|
-| 1 `WAITING_1` | 等待解锁 |
-| 2 `WAITING_2` | 已解锁，等油门 > 1100 或起飞/抛飞触发 |
-| 11 `READY_11` | 解锁瞬间复位 8 个 PID，本拍不输出 |
-| 31 `PROCESS_31` | 正式控制 |
-| 255 `EXIT_255` | 退出并回锁 |
+| 状态机 | 文件 | 状态序列 |
+|---|---|---|
+| 姿态 | `control_attitude.c` | `ATT_IDLE` → `ATT_RESET`（复位 8 个 PID，本拍不输出）→ `ATT_RUN` → `ATT_EXIT` |
+| 混控 | `control_mixer.c` | `MIX_IDLE` → `MIX_ARMED`（等油门 > 1100 或起飞/抛飞）→ `MIX_RUN` → `MIX_EXIT` |
+| 定高 | `control_height.c` | `HGT_IDLE` → `HGT_READY`（记录油门保持值）→ `HGT_RUN` → `HGT_EXIT` |
+| 缓降 | `control_descent.c` | `DESC_IDLE` → `DESC_ACTIVE` → `DESC_DONE` |
+| 解锁 | `remote.c` | `RMT_IDLE` → `RMT_WAIT_HIGH` → `RMT_WAIT_LOW` → `RMT_ARM` → `RMT_RUN` → `RMT_EXIT` |
+
+  这套命名只是改了标识符，**逻辑与数值行为完全没变**。
 
 - **混控矩阵**（X 型四轴，对角同转向）：
 

@@ -27,7 +27,7 @@
  *
  * 关键约定：
  *   - 所有 PID 与业务状态集中在唯一实例 Control 中，跨文件共享；
- *   - 未解锁时姿态状态机停在 WAITING_1、混控状态机停在 WAITING_1，四路输出 0；
+ *   - 未解锁时姿态状态机停在 ATT_IDLE、混控状态机停在 MIX_IDLE，四路输出 0；
  *   - 解锁瞬间先复位前 8 个 PID（RateX/RateY/RateZ/Roll/Pitch/Yaw/HeightRate/HeightHigh）
  *     并把 yaw 参考清零，复位那一拍不输出控制量；
  *   - 10ms 任务各调用的 dt 并不统一：
@@ -36,14 +36,18 @@
  *       Control_Height_Calc   
  */
 
-/* 状态编号，便于日志逐行对照 */
-#define CONTROL_STATUS_WAITING_1 1 // 等待解锁
-#define CONTROL_STATUS_WAITING_2 2 // 已解锁但油门未推起：等待油门 > 1100 或起飞/抛飞触发
-#define CONTROL_STATUS_READY_11 11 // 解锁后复位 PID （本拍不输出）
-#define CONTROL_STATUS_PROCESS_31 31 // 正式控制
-#define CONTROL_STATUS_EXIT_255 255 //退出并回锁
+/* 状态机命名约定
+ *
+ * 每个状态机的枚举都定义在它自己的 .c 文件里，不再共用一套 1/2/11/31/255 编号：
+ *   control_attitude.c ：ATT_IDLE → ATT_RESET → ATT_RUN → ATT_EXIT
+ *   control_mixer.c    ：MIX_IDLE → MIX_ARMED → MIX_RUN → MIX_EXIT
+ *   control_height.c   ：HGT_IDLE → HGT_READY → HGT_RUN → HGT_EXIT
+ *   control_descent.c  ：DESC_IDLE → DESC_ACTIVE → DESC_DONE
+ *   remote.c           ：RMT_IDLE → RMT_WAIT_HIGH → RMT_WAIT_LOW → RMT_ARM → RMT_RUN → RMT_EXIT
+ * 共同的骨架是：IDLE（等条件）→ 中间态 → RUN（正常输出）→ EXIT（退出回锁）。
+ */
 
-#define CONTROL_ARM_THR 1100 // 进入 PROCESS_31 的油门门限
+#define CONTROL_ARM_THR 1100 // 进入 MIX_RUN 的油门门限
 #define CONTROL_THR_CUT 1020 // 低于此油门且非起飞/抛飞时四路强制 0
 #define CONTROL_BASE_LIMIT 700 // 油门基准上限，留 300 给姿态修正
 #define CONTROL_MOTOR_LIMIT 1000 // 单路电机输出上限
@@ -149,15 +153,15 @@ uint8_t Control_Init(void);
  * @param  dt       控制周期（s，须 > 0）
  * @retval 无
  * @note   状态机：
- *         WAITING_1(1) 等遥控解锁 → READY_11(11) 复位 8 个 PID + 航向基准清零
- *         → PROCESS_31(31) 稳态跑串级 PID → EXIT_255(255) 复位并回 WAITING_1。
+ *         ATT_IDLE 等遥控解锁 → ATT_RESET 复位 8 个 PID + 航向基准清零
+ *         → ATT_RUN 稳态跑串级 PID → ATT_EXIT 复位并回 ATT_IDLE。
  *         串级结构：
  *           roll : pid_roll(角度) → rate_x.desired → pid_rate_x(角速度)
  *           pitch: pid_pitch(角度) → rate_y.desired → pid_rate_y(角速度)
  *           yaw  : PID_Cascade(pid_rate_z, pid_yaw) 一条语句完成串联
  *         翻滚特技期间（flip_roll_active / flip_pitch_active）跳过对应角度外环，
  *         只跑角速度内环，内环 desired 由翻滚逻辑在别处给定。
- *         函数末尾强制判遥控锁定：一旦上锁立即进 EXIT_255，保证停控安全。
+ *         函数末尾强制判遥控锁定：一旦上锁立即进 ATT_EXIT，保证停控安全。
  */
 void Control_Attitude_Update(MPU6050_Data_t *pMpu, IMU_Angle_t *pAngle, float dt);
 
@@ -196,8 +200,8 @@ void Control_Attitude_Carefree(float yaw_deg);
  *           m2 = base + rate_x + rate_y - rate_z
  *           m3 = base - rate_x + rate_y + rate_z
  *           m4 = base - rate_x - rate_y - rate_z
- *         状态机：WAITING_1 等解锁 → WAITING_2 等油门过阈 → PROCESS_31 正常输出
- *         → EXIT_255 停机；未解锁时末尾强制进 EXIT_255。
+ *         状态机：MIX_IDLE 等解锁 → MIX_ARMED 等油门过阈 → MIX_RUN 正常输出
+ *         → MIX_EXIT 停机；未解锁时末尾强制进 MIX_EXIT。
  */
 void Control_Mixer_Update(void);
 
@@ -246,11 +250,11 @@ void Control_Height_Calc(float yaw_deg, uint8_t dt_ms);
  *              measured = (measured + ∫a·dt)·0.98 + 0.02·Δh/Δt
  *            加速度计短期准 + 气压高度差分长期准；
  *         4) 状态机：
- *            WAITING_1：等 height_lock && 解锁；
- *            WAITING_2：记录油门保持值，设 desired（起飞/抛飞→100cm，否则当前），进 PROCESS；
- *            PROCESS_31：油门偏离保持值超死区且持续 BREAK 拍 → 重锚 desired=当前高度；跑高度位置环→速度环（位置环输出限幅 ±150）；
- *            EXIT_255：复位高度速度环 PID。
- *         未解锁或链路丢失 → 强制 EXIT_255。
+ *            HGT_IDLE：等 height_lock && 解锁；
+ *            HGT_READY：记录油门保持值，设 desired（起飞/抛飞→100cm，否则当前）；
+ *            HGT_RUN：油门偏离保持值超死区且持续 BREAK 拍 → 重锚 desired=当前高度；跑高度位置环→速度环（位置环输出限幅 ±150）；
+ *            HGT_EXIT：复位高度速度环 PID。
+ *         未解锁或链路丢失 → 强制 HGT_EXIT。
  */
 void Control_Height_Update(float dt);
 

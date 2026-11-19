@@ -59,7 +59,7 @@ uint8_t Remote_Is_Failsafe_Locked(void);
  * @brief  强制写入解锁标志（供控制层一键起飞/急停使用）
  * @param  unlocked 1=解锁，0=锁定
  * @retval 无
- * @note   写 0 会让解锁状态机在 PROCESS_31 自动退出。
+ * @note   写 0 会让解锁状态机在 RMT_RUN 自动退出。
  */
 void Remote_Set_Unlocked(uint8_t unlocked);
 
