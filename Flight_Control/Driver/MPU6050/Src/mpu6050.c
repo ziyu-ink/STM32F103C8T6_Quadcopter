@@ -163,7 +163,7 @@ uint8_t MPU6050_Get_Data(MPU6050_Data_t *out)
     return 1;
 }
 
-/* MPU6050_Calibrate：刚上电静止校准求六轴零偏写入 offset（约 1.1s，期间喂狗），返回 1 成功/0 失败 */
+/* MPU6050_Calibrate：刚上电静止校准写入零偏（az + 陀螺，约 1.1s，期间喂狗），返回 1 成功/0 失败 */
 uint8_t MPU6050_Calibrate(MPU6050_Offset_t *offset)
 {
     if (offset == NULL)
@@ -204,9 +204,12 @@ uint8_t MPU6050_Calibrate(MPU6050_Offset_t *offset)
         DWT_Delay_ms(2);
     }
 
-    /* sum[i] >> 8 等价于 sum[i] / 256，因为采样次数正好是 256。结果先转换为 int16_t，因为零偏本身也应该落在 int16_t 范围内。 */
-    offset->ax = (int16_t)(sum[0] >> 8);
-    offset->ay = (int16_t)(sum[1] >> 8);
+    /* sum[i] >> 8 等价于 sum[i] / 256，因为采样次数正好是 256。结果先转换为 int16_t，因为零偏本身也应该落在 int16_t 范围内。
+       ax/ay 的水平零偏不扣除：均值里混有开机时的倾斜，扣掉等于把当时的姿态当成"水平"。
+       姿态参考由 IMU 的重力修正持续建立，因此这里只写 az（维持静止 1g=8192）与陀螺零偏；
+       ax/ay 的固定残余由遥控器微调补偿。 */
+    offset->ax = 0;
+    offset->ay = 0;
     offset->az = (int16_t)(sum[2] >> 8) - 8192; // 减去重力加速度的偏移量，静止时 Z 轴加速度为 +1g，对应 MPU6050 的 ±4g 量程下的原始值为 8192
     offset->gx = (int16_t)(sum[3] >> 8);
     offset->gy = (int16_t)(sum[4] >> 8);
