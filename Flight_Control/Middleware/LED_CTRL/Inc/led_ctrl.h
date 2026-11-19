@@ -4,15 +4,16 @@
 /*
  * LED_CTRL 模块：飞控状态灯效控制（Middleware 层）。
  * 状态机（优先级从高到低）：
- *   初始化失败 → 4 灯急促闪（死循环内，由 Error_Handler 调用）
+ *   初始化失败 → 4 灯 100ms 亮灭交替（死循环内，由 Error_Handler 调用）
  *   校准中     → 4 灯常亮（App_Init 期间）
- *   等遥控首包 → 慢闪 1Hz（Remote.connected==0）
- *   低压地面   → 双闪 800ms（Battery_Is_Low）
- *   失控锁定   → 急促闪 8Hz（Remote_Is_Failsafe_Locked）
- *   锁定待机   → 快闪 4Hz
+ *   失控锁定   → 急闪 300ms 周期（Remote_Is_Failsafe_Locked）
+ *   链路丢失   → 慢闪 2s 周期（Remote_Is_Link_Lost）
+ *   低压地面   → 双闪 800ms 周期（Battery_Is_Low）
+ *   上电稳定中 → 4 灯流水 600ms 一轮（上电 8s 内且未解锁，提示姿态还在收敛）
+ *   锁定待机   → 快闪 500ms 周期
  *   解锁·无头  → 全亮
  *   解锁·有头  → B+H 亮
- * 调用节拍：Task_50ms（20Hz），内部用计数器分频出 1Hz/4Hz/8Hz。
+ * 调用节拍：Task_50ms（20Hz），内部用计数器分频出上表的各档周期。
  */
 
 /**
@@ -36,17 +37,19 @@ void LED_Ctrl_Init(void);
 void LED_Ctrl_Set_Calibrating(void);
 
 /**
- * @brief  LED 状态机单拍更新（建议 10ms 周期调用）
+ * @brief  LED 状态机单拍更新（建议 50ms 周期调用，即 20Hz）
  * @param  无
  * @retval 无
  * @note   优先级（高→低），每分支执行后立即 return，实现高优先级独占：
- *         1) 失控锁定   → 急闪（3 拍半周期）
- *         2) 链路丢失   → 慢闪（20 拍半周期）
- *         3) 电池低     → 双闪（2/2/2/10，独立相位 s_dbl_phase，16 拍循环）
- *         4) 未解锁     → 快闪（5 拍半周期）
- *         5) 无头模式   → 常亮
- *         6) 普通模式   → 4 灯特定组合（A 灭 / B 亮 / H 亮 / F 灭）
- *         时间基准 s_tick 每拍 +1，到 250 回绕（避免 uint8_t 溢出）。
+ *         1) 失控锁定   → 急闪（3 拍半周期，300ms 周期）
+ *         2) 链路丢失   → 慢闪（20 拍半周期，2s 周期）
+ *         3) 电池低     → 双闪（2/2/2/10，独立相位 s_dbl_phase，16 拍 = 800ms）
+ *         4) 上电稳定中 → 4 灯流水（每颗 3 拍 = 150ms，一轮 600ms；上电 8s 内且未解锁）
+ *         5) 未解锁     → 快闪（5 拍半周期，500ms 周期）
+ *         6) 无头模式   → 常亮
+ *         7) 普通模式   → 4 灯特定组合（A 灭 / B 亮 / H 亮 / F 灭）
+ *         时间基准 s_tick 每拍 +1，到 250 回绕（避免 uint8_t 溢出）；
+ *         s_boot_ticks 记录上电拍数，饱和在 160 拍（8s），只用于稳定窗口判断。
  */
 void LED_Ctrl_Update(void);
 

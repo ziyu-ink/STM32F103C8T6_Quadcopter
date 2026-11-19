@@ -20,9 +20,14 @@
 #define LED_DBL_ON2 2U
 // LED_DBL_OFF2：双闪长灭拍数
 #define LED_DBL_OFF2 10U
+// LED_STABILIZE_TICKS：上电稳定窗口拍数（20Hz × 8s），窗口内 4 灯流水提示姿态还在收敛
+#define LED_STABILIZE_TICKS 160U
+// LED_STABILIZE_STEP：流水灯每颗 LED 保持的拍数（3 拍 = 150ms，整轮 600ms）
+#define LED_STABILIZE_STEP 3U
 
 static uint8_t s_tick = 0; // s_tick：状态机拍计数
 static uint8_t s_dbl_phase = 0; // s_dbl_phase：双闪独立相位
+static uint16_t s_boot_ticks = 0; // s_boot_ticks：上电后已运行拍数，饱和到 LED_STABILIZE_TICKS
 
 /* LED_Ctrl_Init：上电先全灭 */
 void LED_Ctrl_Init(void)
@@ -44,6 +49,12 @@ void LED_Ctrl_Update(void)
     if (s_tick >= 250U)
     {
         s_tick = 0U;
+    }
+
+    /* 上电计时：用于稳定窗口，饱和在窗口长度 */
+    if (s_boot_ticks < LED_STABILIZE_TICKS)
+    {
+        s_boot_ticks++;
     }
 
     /* 失控锁定：急闪 */
@@ -98,6 +109,30 @@ void LED_Ctrl_Update(void)
         else
         {
             LED_All_Off();
+        }
+        return;
+    }
+
+    /* 上电稳定窗口：姿态估计还在往重力收敛，4 灯流水提示“先别解锁” */
+    if (!Remote_Is_Unlocked() && (s_boot_ticks < LED_STABILIZE_TICKS))
+    {
+        /* 每 LED_STABILIZE_STEP 拍换一颗灯：A → B → H → F 循环 */
+        uint8_t phase = (uint8_t)((s_tick / LED_STABILIZE_STEP) & 0x03U);
+        LED_All_Off();
+        switch (phase)
+        {
+            case 0U:
+                LED_Set(LED_A);
+                break;
+            case 1U:
+                LED_Set(LED_B);
+                break;
+            case 2U:
+                LED_Set(LED_H);
+                break;
+            default:
+                LED_Set(LED_F);
+                break;
         }
         return;
     }
