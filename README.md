@@ -200,6 +200,12 @@ arm-none-eabi-objcopy -O binary build/Debug/Flight_Control.elf build/Debug/Fligh
 
 ## 许可证
 
-本仓库目前**还没有添加 LICENSE**（默认保留所有权利）。如需开源请补一个（MIT / Apache-2.0 等）。
+本项目使用 **MIT 许可证**，全文见 [LICENSE](./LICENSE)。
 
-第三方代码保留各自许可：`Flight_Control/Drivers/` 下的 ST HAL 与 CMSIS 见其中的 `LICENSE.txt`。
+用大白话说清楚它意味着什么：
+
+- **你可以随便用**：复制、修改、拿去商用、改成闭源再发布，都不用问作者；
+- **只有一个要求**：保留版权声明和许可证原文，也就是别把作者名字删掉；
+- **作者不担责任**：飞坏了、炸机了、烧了板子，都由使用的人自己负责。
+
+第三方代码不在这份许可证范围内：`Flight_Control/Drivers/` 下的 ST 官方 HAL 库与 CMSIS 有各自的 `LICENSE.txt`，以它们为准。
