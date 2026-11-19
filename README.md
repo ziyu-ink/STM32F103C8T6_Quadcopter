@@ -171,6 +171,7 @@ arm-none-eabi-objcopy -O binary build/Debug/Flight_Control.elf build/Debug/Fligh
 ## 可视化文档是怎么来的
 
 - 每张图都是一个独立的 Archify HTML，用 `data:text/html;base64,…` 内嵌进页面（首屏那张不用 `loading="lazy"`，其余都懒加载），所以整页**不发任何网络请求**，断网也能看。
+- 页面底部有一行 **构建标记**（时间 + `v3-scroll-fix` 之类的版本名）。**看不到这一行就是你打开的是旧文件或浏览器缓存**，按 `Ctrl+F5`（手机上拉刷新）强制刷新。
 - 图里 `meta.repository.revision` 指向源码基线提交 `3d0522b`；页面文件本身在更晚的提交里，因此**页面所在 commit 与图内 revision 不同**是正常的。
 - 图里标「源码确证」的是直接读到的代码，标「推算」的是由代码常量算出的量（例如 PWM 频率、看门狗超时）。
 
