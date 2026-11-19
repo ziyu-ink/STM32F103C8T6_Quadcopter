@@ -65,7 +65,7 @@ STM32F103C8T6_Quadcopter/
 | 功能 | 总线 / 引脚 | 关键参数 |
 |---|---|---|
 | 主控与时钟 | HSE 8 MHz，PLL ×9 | SYSCLK 72 MHz；APB1 36 MHz、APB2 72 MHz；ADC 由 PCLK2/6 供钟 |
-| MPU6050 | 软件 I2C，PB6=SCL、PB7=SDA | ±2000 °/s、±4 g，DLPF 42 Hz，采样 333 Hz；上电 256 组零偏标定 |
+| MPU6050 | 软件 I2C，PB6=SCL、PB7=SDA | ±2000 °/s、±4 g，DLPF 42 Hz，采样 333 Hz；上电 256 组静止标定，只校 az 与陀螺零偏，不要求水平放置 |
 | SPL06 气压计 | 同一条软件 I2C | 气压 / 温度；标定系数开机加载 |
 | NRF24L01 | SPI2 + CE=PA11、CSN=PB12 | 频道 66、2 Mbps、地址 `AABBCC0001`、32 字节动态载荷 |
 | PMW3901 光流 | USART1，单字节中断 | 19200 8N1，11 字节帧，`qual ≥ 25` 才算有效 |
@@ -140,6 +140,7 @@ m4 = base - rate_x - rate_y - rate_z
 
 - **几个关键阈值**：`ARM_THR=1100`（进入控制的油门门限）、`THR_CUT=1020`（低于此值四路强制 0）、`BASE_LIMIT=700`（基准上限，留 300 给姿态修正）、`MOTOR_LIMIT=1000`（单路上限 = 一个 PWM 周期）。
 - **解锁三步**：油门 < 1150 → > 1800 保持 6 拍 → 再 < 1150；右下角手势（油门 < 1200 且 yaw > 1800）任意时刻立即上锁。
+- **高度源与定点窗口**：光流高度在 50~4000 mm 且 `Flow.ok` 时优先，否则用气压高度；光流定点只在 `control_high ∈ (20, 400) cm` 且摇杆在 ±150 死区内接管，出界即退回摇杆直通。
 
 ---
 
@@ -191,6 +192,8 @@ arm-none-eabi-objcopy -O binary build/Debug/Flight_Control.elf build/Debug/Fligh
 - `Control_Init()` 只写增益和业务标志，**不清 PID 内部状态**（`integ / prevError / out`）；要在解锁那一拍靠 `PID_Reset` 统一清零。
 - `IMU_Get_Angle` 的 `dt` 必须与 6 ms 真实周期一致，否则积分增益和收敛速度都会偏。
 - 光流 `loc_x` 来自 `out_y_i`、`loc_y` 来自 `out_x_i`（模块安装方向决定），不要“顺手改正”。
+- 光流 `cpi` 固定按 50 cm 高度换算，不随实测高度变化：飞得越高，位置环的等效增益越小（100 cm 处约减半），手感会随高度变“软”。
+- 姿态的“水平”参考由 Mahony 用重力持续建立，开机只要求静止、不要求放平；加计 `ax/ay` 的固定残余（芯片零偏 + 安装倾斜）由遥控器微调补偿。
 
 ---
 
