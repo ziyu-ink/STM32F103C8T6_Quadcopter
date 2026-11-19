@@ -38,7 +38,7 @@
 
 /* 状态机命名约定
  *
- * 每个状态机的枚举都定义在它自己的 .c 文件里，不再共用一套 1/2/11/31/255 编号：
+ * 每个状态机的枚举都定义在它自己的 .c 文件里，五个枚举共用同一个骨架：
  *   control_attitude.c ：ATT_IDLE → ATT_RESET → ATT_RUN → ATT_EXIT
  *   control_mixer.c    ：MIX_IDLE → MIX_ARMED → MIX_RUN → MIX_EXIT
  *   control_height.c   ：HGT_IDLE → HGT_READY → HGT_RUN → HGT_EXIT

@@ -100,7 +100,7 @@ ST HAL + CMSIS → TIMx->CCR / GPIOx->BSRR
 
 - **3 组串级 PID，共 12 个环**：姿态（角度→角速度，6 个）、高度（位置→速度，2 个）、光流定点（位置→速度，4 个）。
 - **`ki` 全为 0**：纯 P / PD，没有积分抗静差；缓降另有一个私有环（`kp=1.0 / ki=0.25 / kd=0`），不在参数表里。
-- **状态机命名**：每个状态机都有自己的枚举，定义在各自的 `.c` 文件里，不再共用一套 1/2/11/31/255 的编号。共同的骨架是 `IDLE → 中间态 → RUN → EXIT`：
+- **状态机命名**：每个状态机都有自己的枚举，定义在各自的 `.c` 文件里，共同的骨架是 `IDLE → 中间态 → RUN → EXIT`：
 
 | 状态机 | 文件 | 状态序列 |
 |---|---|---|
@@ -109,8 +109,6 @@ ST HAL + CMSIS → TIMx->CCR / GPIOx->BSRR
 | 定高 | `control_height.c` | `HGT_IDLE` → `HGT_READY`（记录油门保持值）→ `HGT_RUN` → `HGT_EXIT` |
 | 缓降 | `control_descent.c` | `DESC_IDLE` → `DESC_ACTIVE` → `DESC_DONE` |
 | 解锁 | `remote.c` | `RMT_IDLE` → `RMT_WAIT_HIGH` → `RMT_WAIT_LOW` → `RMT_ARM` → `RMT_RUN` → `RMT_EXIT` |
-
-  这套命名只是改了标识符，**逻辑与数值行为完全没变**。
 
 - **混控矩阵**（X 型四轴，对角同转向）：
 
@@ -163,7 +161,7 @@ arm-none-eabi-objcopy -O binary build/Debug/Flight_Control.elf build/Debug/Fligh
 
 ## 已知的坑
 
-- `Task_10ms` 里 6 个调用的 `dt` 分两种标度：`Control_Height_Get` / `Control_Descent_Update` / `Control_Height_Calc` 用真实 10ms（`TASK_10MS_DT`），另外三个 `Pixel_Flow_Fix` / `Control_Position_Update` / `Control_Height_Update` 用的是 `TASK_10MS_DT_LEGACY = 0.006f`（6ms 档的值）。**保留原值是有意的**：现有增益在这个标度下整定，改成 0.01 会让这三个环的微分项掉到 60%。宏与理由写在 `scheduler.c` 顶部。
+- `Task_10ms` 里 6 个调用的 `dt` 分两种标度：`Control_Height_Get` / `Control_Descent_Update` / `Control_Height_Calc` 用真实 10ms（`TASK_10MS_DT`），另外三个 `Pixel_Flow_Fix` / `Control_Position_Update` / `Control_Height_Update` 用 `TASK_10MS_DT_CTRL = 0.006f`（控制环标度）。这几个环的微分项按该标度整定，改成 0.01 会让它们整体变成 60%。宏与理由写在 `scheduler.c` 顶部。
 - `Control_Init()` 只写增益和业务标志，**不清 PID 内部状态**（`integ / prevError / out`）；要在解锁那一拍靠 `PID_Reset` 统一清零。
 - `IMU_Get_Angle` 的 `dt` 必须与 6 ms 真实周期一致，否则积分增益和收敛速度都会偏。
 - 光流 `loc_x` 来自 `out_y_i`、`loc_y` 来自 `out_x_i`（模块安装方向决定），不要“顺手改正”。

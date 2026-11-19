@@ -294,7 +294,7 @@
     <p class="sub">代码里每个状态机都有自己的枚举，骨架统一成 <code>IDLE → 中间态 → RUN → EXIT</code>。下表就是源码里的状态名，可以直接对着 <code>case</code> 找。</p>
     <div class="tablewrap">
       <table>
-        <caption>状态机命名对照（原先共用一套 1 / 2 / 11 / 31 / 255 编号，已废弃）</caption>
+        <caption>状态机命名对照（五个枚举共用 IDLE → 中间态 → RUN → EXIT 骨架）</caption>
         <thead><tr><th>状态机</th><th>文件</th><th>状态序列</th></tr></thead>
         <tbody>
           <tr><td>姿态</td><td><code>control_attitude.c</code></td><td><code>ATT_IDLE</code> → <code>ATT_RESET</code> → <code>ATT_RUN</code> → <code>ATT_EXIT</code></td></tr>
@@ -511,12 +511,12 @@
 
     <h3>常见误解</h3>
     <ol class="guide">
-      <li><b>“Task_10ms 里传 0.006f 是笔误”</b> —— 是历史标度。现在它有名字 <code>TASK_10MS_DT_LEGACY</code>；改成 0.01 会让三个环的微分项掉到 60%，等于改增益。</li>
+      <li><b>“Task_10ms 里传 0.006f 是笔误”</b> —— 不是。三个控制环调用按 0.006s 标度计算（宏 <code>TASK_10MS_DT_CTRL</code>），而本档真实周期是 10ms；这几个环的微分项就是按这个标度整定的，改成 0.01 会让它们整体变成 60%。</li>
       <li><b>“光流速度环的 measured 应该是速度”</b> —— 本工程刻意用位置，等价于对位置做 P-D 控制；换成速度必须把三组增益整体重新整定。</li>
       <li><b>“ki = 0 是忘了写”</b> —— 12 个环全是纯 P / PD，这是设计选择，不是缺省值。</li>
       <li><b>“PID_Reset 会把 PID 清空”</b> —— 它只清 <code>integ / prevError / out</code>，增益和 <code>desired / measured</code> 都保留。</li>
       <li><b>“Control_Init 可以随时调”</b> —— 它不重置 PID 内部状态；上电靠 <code>.bss</code> 清零没问题，运行期（收到 0xE0 恢复默认）会带着旧积分。</li>
-      <li><b>“11 / 31 / 255 有特殊含义”</b> —— 没有。已改成 <code>ATT_* / MIX_* / HGT_* / DESC_* / RMT_*</code> 枚举，见 ③。</li>
+      <li><b>“<code>s_</code> 开头的是局部变量”</b> —— 都是**文件级 static**，跨拍保持、全文件可见；`s_quat`、`s_fuse_speed` 这类状态就藏在这里。</li>
       <li><b>“光流 loc_x 应该来自 x 轴”</b> —— 按模块安装方向，<code>loc_x</code> 来自 <code>out_y_i</code>、<code>loc_y</code> 来自 <code>out_x_i</code>，不能“顺手改正”。</li>
       <li><b>“IMU 的 dt 随便填”</b> —— 它直接乘进四元数积分和 yaw 积分，改周期必须同步改它。</li>
       <li><b>“电调是 1000~2000 微秒”</b> —— 本工程是 18kHz、占空比 0~1000，不是标准电调脉宽。</li>
@@ -655,7 +655,7 @@
   </main>
 
   <footer class="foot">
-    <p class="build"><b>构建标记：</b><code>2026-11-19 14:16 · v7-glossary</code> · 这一行就是版本凭证——如果你打开的页面底部看不到它，说明看的是旧文件或浏览器缓存，按 Ctrl+F5（手机：下拉刷新）强制刷新即可。</p>
+    <p class="build"><b>构建标记：</b><code>2026-11-19 14:23 · v1</code> · 这一行就是版本凭证——如果你打开的页面底部看不到它，说明看的是旧文件或浏览器缓存，按 Ctrl+F5（手机：下拉刷新）强制刷新即可。</p>
     <p><b>图怎么来的：</b>每张图都是 Archify 生成的独立 HTML，以 <code>data:text/html;base64</code> 内嵌在本页里（除第一张外均为 <code>loading="lazy"</code>），所以整页离线可看、不请求任何外部资源。</p>
     <p><b>图内 revision：</b><code>3d0522b</code>（导入源码的基线提交）。页面文件本身在之后的提交里，因此页面所在 commit 会与图内 revision 不同——图描述的是那份源码，不是页面自身的改动。</p>
     <p><b>怎么核对：</b>图里每个节点都能点开看 <code>path:line</code> 来源；标「源码确证」的是直接读到的代码，标「推算」的是由代码常量算出来的量（例如 PWM 频率）。</p>

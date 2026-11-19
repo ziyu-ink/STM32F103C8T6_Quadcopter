@@ -29,15 +29,14 @@
 // TASK_10MS_PERIOD_MS：同一个周期的毫秒写法（Control_Height_Calc 要的是毫秒）
 #define TASK_10MS_PERIOD_MS 10U
 
-/* TASK_10MS_DT_LEGACY：10ms 档里三个调用的"历史标度"。
+/* TASK_10MS_DT_CTRL：10ms 档里控制环使用的 dt 标度（0.006s）。
  *
- * Pixel_Flow_Fix / Control_Position_Update / Control_Height_Update 一直传的是
- * 0.006f（6ms 档的值），而本档真实周期是 10ms —— 两者并不相等。
+ * 本档真实周期是 TASK_10MS_DT（0.01s），但光流融合、定点环、高度环这三处
+ * 按 0.006s 计算，与 2ms / 6ms 档的 dt 保持同一量级。
  *
- * 现有增益（尤其光流速度环 kd 0.40、位置环 kd 0.006）就是在这个标度下整定的：
- * 改成 0.01f 会让这三个环的微分项整体变成原来的 60%，等于同时改三个环的增益。
- * 所以这里保留原值，只给它一个能看懂的名字；真要修正必须重新试飞整定。 */
-#define TASK_10MS_DT_LEGACY 0.006f
+ * 这三个环的微分项（光流速度环 kd 0.40、位置环 kd 0.006）按这个标度整定；
+ * 若改成 0.01f，微分项会整体变成 60%，属于重新整定增益，必须重新试飞。 */
+#define TASK_10MS_DT_CTRL 0.006f
 
 static IMU_Angle_t s_angle = {0}; // s_angle：全局姿态角
 static uint32_t s_cnt_2ms = 0; // s_cnt_2ms：2ms 档计数
@@ -191,11 +190,11 @@ static void Task_10ms(void)
     }
 
     SPL06_Get_Data(&s_p, &s_t);
-    Pixel_Flow_Fix(TASK_10MS_DT_LEGACY, &s_angle);          // 历史标度 0.006f，见宏处注释
-    Control_Position_Update(TASK_10MS_DT_LEGACY);           // 历史标度 0.006f
+    Pixel_Flow_Fix(TASK_10MS_DT_CTRL, &s_angle);          // 控制环标度 0.006s
+    Control_Position_Update(TASK_10MS_DT_CTRL);           // 控制环标度 0.006s
     Control_Height_Get(s_p, TASK_10MS_DT);                  // 真实 10ms
     Control_Height_Calc(s_angle.yaw, TASK_10MS_PERIOD_MS);  // 真实 10ms（毫秒写法）
-    Control_Height_Update(TASK_10MS_DT_LEGACY);             // 历史标度 0.006f
+    Control_Height_Update(TASK_10MS_DT_CTRL);             // 控制环标度 0.006s
     Control_Descent_Update(&s_angle, TASK_10MS_DT);         // 真实 10ms
 
     ANO_DT_Send_Senser(s_mpu.ax, s_mpu.ay, s_mpu.az,s_mpu.gx, s_mpu.gy, s_mpu.gz,(int32_t)Flow.flow_x_iOUT, (int32_t)Flow.flow_y_iOUT,Flow.qual);
