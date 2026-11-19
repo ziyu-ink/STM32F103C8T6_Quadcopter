@@ -153,11 +153,17 @@ arm-none-eabi-objcopy -O binary build/Debug/Flight_Control.elf build/Debug/Fligh
 1. `Core/Src/main.c` — 时钟怎么配、外设 Init 顺序、主循环只有一句 `Scheduler_Run()`。
 2. `Middleware/APP/Src/app.c` — 初始化链的依赖顺序都在这（先 I2C 才能 Init MPU6050，先 NRF 才能注册发送钩子）。
 3. `Middleware/SCHEDULER/Src/scheduler.c` — 6 档任务怎么分派。
-4. `Middleware/CONTROL/Inc/control.h` — **先读文件头注释**：状态编号、全部阈值宏、每个函数的调用节拍与 `dt`。
+4. `Middleware/CONTROL/Inc/control.h` — **先读文件头注释**：五个状态机的命名约定、全部阈值宏、每个函数的调用节拍与 `dt`。
 5. `Middleware/CONTROL/Src/control_attitude.c` → `control_mixer.c` — 串级怎么串、四路怎么算。
 6. `Driver/MOTOR/Src/motor.c` → `HALPort/PWM_PORT/Src/pwm_port.c` → `Core/Src/tim.c` — 最短的一条“到底”链：`duty → 通道映射 → __HAL_TIM_SET_COMPARE → TIM2->CCR1`。
 
 更细的路线（13 步）和逐图讲解都在[可视化文档](./flight-control-index.html)里。
+
+### 想自己从零搭一遍？
+
+上面是**读**的顺序（跟着调用关系走）。**搭**的顺序正好相反：从 DWT / LED 这种最底层开始，一次只加一条链路，每加一层都有一个看得见的验收现象。
+
+`Flight_Control/CMakeLists.txt` 里 `target_sources` 的分组注释就是按这个顺序排的（12 个阶段，顺序请勿重排）；页面「④ 阅读路线」末尾也有一张同样的表，带每个阶段的验收标准。
 
 ---
 

@@ -193,7 +193,7 @@
       <li><b>① 模块关系</b>：先看遥控到桨叶的闭环，弄清哪一段给哪一段送数据。</li>
       <li><b>② 节拍/时序</b>：6 张图对应 6 个调度档，看每一档里谁先谁后、谁必须在前。</li>
       <li><b>③ 生命周期</b>：从复位到落地锁定，主路径一条、失败路三条。</li>
-      <li><b>④ 阅读路线</b>：按打开顺序列文件，每步一句话说明为什么要读它。</li>
+      <li><b>④ 阅读路线</b>：按打开顺序列文件；末尾还有一张“从零搭一遍”的 12 阶段表。</li>
       <li><b>⑤ 数据结构</b>：7 个跨层结构体撑起数据流，附 12 个 PID 的实际增益表。</li>
       <li><b>⑥ 函数调用链</b>：一条链从 Task_2ms 追到 TIM2-&gt;CCR1，看清每层只碰自己的东西。</li>
       <li><b>⑦ 分层架构</b>：四层边界怎么拼，谁依赖谁、换 MCU 时动哪一层。</li>
@@ -309,7 +309,7 @@
   </section>
   <section id="route">
     <h2><span class="n">④</span>阅读路线</h2>
-    <p class="sub">按打开顺序读，每一步都说明为什么现在读它。从入口一路到寄存器，再回头补算法。</p>
+    <p class="sub">按打开顺序读，每一步都说明为什么现在读它。从入口一路到寄存器，再回头补算法；末尾还给了<b>反过来</b>的一张表——自己从零搭一遍时的 12 个阶段。</p>
     <ol class="route">
       <li><span class="p">Core/Src/main.c</span><span class="w">入口：时钟怎么配、外设按什么顺序 Init、主循环里只有一句 Scheduler_Run。</span></li>
       <li><span class="p">Middleware/APP/Src/app.c</span><span class="w">一条 App_Init 初始化链，依赖顺序全在这里（先 I2C 才能 Init MPU6050，先 NRF 才能注册发送钩子）。</span></li>
@@ -325,6 +325,30 @@
       <li><span class="p">Middleware/CONTROL/Src/control_position.c → Middleware/FLOW/Src/flow.c</span><span class="w">光流定点：位置环→速度环，再由模式层把速度输出转成期望倾角。</span></li>
       <li><span class="p">Middleware/ANO_PARAM/Src/ano_param.c → HALPort/EEPROM_EMU/Src/eeprom_emu.c</span><span class="w">在线调参怎么落到 Flash 双页上，以及掉电重启后如何恢复。</span></li>
     </ol>
+
+    <h3>搭建顺序：自己从零写一遍时用</h3>
+    <p class="sub">上面是<b>读</b>的顺序（跟着调用关系走）；这里是<b>搭</b>的顺序（从下往上，每阶段都有能看见的验收现象）。<code>CMakeLists.txt</code> 里 <code>target_sources</code> 的分组注释就是按这张表排的，顺序与文件一致。</p>
+    <div class="tablewrap">
+      <table>
+        <caption>12 个阶段：先让这一层跑起来，再加下一层</caption>
+        <thead><tr><th>阶段</th><th>模块</th><th>验收标准</th></tr></thead>
+        <tbody>
+          <tr><td class="num">1</td><td>DEBUG / DWT / LED</td><td>串口能打印、灯能闪、能读到微秒</td></tr>
+          <tr><td class="num">2</td><td>软 I2C / 看门狗 / 卡尔曼 / MPU6050</td><td>六轴能读、零偏能标定</td></tr>
+          <tr><td class="num">3</td><td>SPL06</td><td>气压与温度能打印</td></tr>
+          <tr><td class="num">4</td><td>SPI_PORT / NRF GPIO / NRF24L01</td><td>能收一包、能发一包</td></tr>
+          <tr><td class="num">5</td><td>PWM_PORT / MOTOR</td><td>四路占空比可调（<b>测试先拆桨</b>）</td></tr>
+          <tr><td class="num">6</td><td>ADC_PORT / BATTERY</td><td>电压读数 + 低压判定</td></tr>
+          <tr><td class="num">7</td><td>MY_MATH / IMU</td><td>roll / pitch / yaw 能输出</td></tr>
+          <tr><td class="num">8</td><td>ANO_DT / REMOTE / UART1_PORT</td><td>能解 10 通道、能解锁与上锁</td></tr>
+          <tr><td class="num">9</td><td>EEPROM_EMU</td><td>掉电保存一个值，重启能读回</td></tr>
+          <tr><td class="num">10</td><td>FILTER / PID / FLOW</td><td>单环 PID 能跟上阶跃、光流能出 cm</td></tr>
+          <tr><td class="num">11</td><td>CONTROL 七个文件</td><td>串级能稳、定高能保持</td></tr>
+          <tr><td class="num">12</td><td>ANO_PARAM / LED_CTRL / SCHEDULER / APP</td><td>6 档节拍跑起来、上电自检通过</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="sub">第 0 步不在这个列表里：时钟、GPIO、外设初始化与中断在 <code>Core/</code>（由 <code>cmake/stm32cubemx/CMakeLists.txt</code> 整块引入），搭之前先把那里跑通。</p>
   </section>
 
   <!-- ================= ⑤ 数据结构 ================= -->
@@ -657,7 +681,7 @@
   </main>
 
   <footer class="foot">
-    <p class="build"><b>构建标记：</b><code>2026-11-19 14:24 · v1</code> · 这一行就是版本凭证——如果你打开的页面底部看不到它，说明看的是旧文件或浏览器缓存，按 Ctrl+F5（手机：下拉刷新）强制刷新即可。</p>
+    <p class="build"><b>构建标记：</b><code>2026-11-19 15:09 · v1</code> · 这一行就是版本凭证——如果你打开的页面底部看不到它，说明看的是旧文件或浏览器缓存，按 Ctrl+F5（手机：下拉刷新）强制刷新即可。</p>
     <p><b>图怎么来的：</b>每张图都是 Archify 生成的独立 HTML，以 <code>data:text/html;base64</code> 内嵌在本页里（除第一张外均为 <code>loading="lazy"</code>），所以整页离线可看、不请求任何外部资源。</p>
     <p><b>图内 revision：</b><code>3d0522b</code>（导入源码的基线提交）。页面文件本身在之后的提交里，因此页面所在 commit 会与图内 revision 不同——图描述的是那份源码，不是页面自身的改动。</p>
     <p><b>怎么核对：</b>图里每个节点都能点开看 <code>path:line</code> 来源；标「源码确证」的是直接读到的代码，标「推算」的是由代码常量算出来的量（例如 PWM 频率）。</p>
