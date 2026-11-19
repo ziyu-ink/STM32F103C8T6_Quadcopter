@@ -68,7 +68,7 @@
   /* ---------- figure ---------- */
   figure{margin:14px 0 0}
   .frame{border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; background:var(--framebg)}
-  iframe{display:block; width:100%; height:60vh; min-height:300px; border:0}
+  iframe{display:block; width:100%; height:60vh; height:60svh; min-height:300px; border:0}
   figcaption{margin:10px 2px 0; font-size:13px; color:var(--dim); display:flex; flex-direction:column; gap:5px}
   figcaption b{color:#cfdcea; font-weight:600}
   figcaption .tag{display:inline-block; font-size:11px; padding:1px 7px; border-radius:999px; border:1px solid var(--line); color:var(--dim2); margin-right:6px}
@@ -106,11 +106,13 @@
   td.zero{color:var(--dim2)}
 
   .foot{margin-top:44px; padding-top:16px; border-top:1px solid var(--line2); font-size:12px; color:var(--dim2); line-height:1.7}
+  .foot .build{margin:0 0 12px; padding:10px 12px; background:var(--panel); border:1px solid var(--line); border-radius:10px; color:var(--dim)}
+  .foot .build code{color:var(--cyan2); font-weight:600}
   .foot code{color:var(--dim)}
   .divider{margin:26px 0 0; height:1px; background:var(--line2)}
 
   @media (max-width:480px){
-    iframe{height:54vh}
+    iframe{height:54vh; height:54svh}
     body{font-size:15px}
     h2{font-size:1.04rem}
     .wrap{padding-bottom:56px}
@@ -386,6 +388,7 @@
   </main>
 
   <footer class="foot">
+    <p class="build"><b>构建标记：</b><code>2026-11-19 13:15 · v3-scroll-fix</code> · 这一行就是版本凭证——如果你打开的页面底部看不到它，说明看的是旧文件或浏览器缓存，按 Ctrl+F5（手机：下拉刷新）强制刷新即可。</p>
     <p><b>图怎么来的：</b>每张图都是 Archify 生成的独立 HTML，以 <code>data:text/html;base64</code> 内嵌在本页里（除第一张外均为 <code>loading="lazy"</code>），所以整页离线可看、不请求任何外部资源。</p>
     <p><b>图内 revision：</b><code>3d0522b</code>（导入源码的基线提交）。页面文件本身在之后的提交里，因此页面所在 commit 会与图内 revision 不同——图描述的是那份源码，不是页面自身的改动。</p>
     <p><b>怎么核对：</b>图里每个节点都能点开看 <code>path:line</code> 来源；标「源码确证」的是直接读到的代码，标「推算」的是由代码常量算出来的量（例如 PWM 频率）。</p>
