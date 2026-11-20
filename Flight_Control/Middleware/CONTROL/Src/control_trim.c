@@ -56,6 +56,8 @@ void Control_Trim_Load(void)
     {
         Control.trim_pitch = (float)(int16_t)v_p / 100.0f;
     }
+
+    printf("[trim] loaded roll=%+.2f pitch=%+.2f\r\n", (double)Control.trim_roll, (double)Control.trim_pitch);
 }
 
 /* Control_Trim_Is_Active：是否正在测量 */
