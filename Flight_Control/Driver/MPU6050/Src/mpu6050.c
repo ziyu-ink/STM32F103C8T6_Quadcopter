@@ -163,7 +163,14 @@ uint8_t MPU6050_Get_Data(MPU6050_Data_t *out)
     return 1;
 }
 
-/* MPU6050_Calibrate：刚上电静止校准写入零偏（az + 陀螺，约 1.1s，期间喂狗），返回 1 成功/0 失败 */
+// MPU6050_CAL_STILL_DIFF：判定静止的相邻采样差阈值（LSB，±2000°/s 量程下约 0.3°/s）
+#define MPU6050_CAL_STILL_DIFF 5
+// MPU6050_CAL_STILL_CNT：连续静止拍数（×2ms = 50ms）
+#define MPU6050_CAL_STILL_CNT 25U
+// MPU6050_CAL_STILL_MAX：最长等待拍数（×2ms = 500ms），超时照常校准
+#define MPU6050_CAL_STILL_MAX 250U
+
+/* MPU6050_Calibrate：刚上电静止校准写入零偏（az + 陀螺，先等静止再采样，超时照常校准），返回 1 成功/0 失败 */
 uint8_t MPU6050_Calibrate(MPU6050_Offset_t *offset)
 {
     if (offset == NULL)
@@ -174,6 +181,50 @@ uint8_t MPU6050_Calibrate(MPU6050_Offset_t *offset)
     MPU6050_Data_t raw = {0}; // raw：单次采样数据
     int32_t sum[6] = {0}; // sum：六轴累加和
     uint16_t i = 0; // i：采样与累加循环下标
+    int16_t last_g[3] = {0}; // last_g：上一拍的陀螺三轴值
+    uint16_t still_cnt = 0; // still_cnt：连续静止拍数
+    uint16_t wait_cnt = 0; // wait_cnt：等待静止的拍数
+
+    /* 先等静止：相邻两次采样的陀螺差都在阈值内，才认为飞机没在晃。
+       超时（约 500ms）仍继续校准——宁可用略差的零偏，也不能让飞控卡在启动里。 */
+    if (!MPU6050_Get_Data(&raw))
+    {
+        return 0;
+    }
+    last_g[0] = raw.gx;
+    last_g[1] = raw.gy;
+    last_g[2] = raw.gz;
+
+    while ((still_cnt < MPU6050_CAL_STILL_CNT) && (wait_cnt < MPU6050_CAL_STILL_MAX))
+    {
+        if (!MPU6050_Get_Data(&raw))
+        {
+            return 0; // 读取失败
+        }
+
+        int16_t d0 = (int16_t)(raw.gx - last_g[0]); // d0：X 轴相邻采样差
+        int16_t d1 = (int16_t)(raw.gy - last_g[1]); // d1：Y 轴相邻采样差
+        int16_t d2 = (int16_t)(raw.gz - last_g[2]); // d2：Z 轴相邻采样差
+
+        if ((d0 <= MPU6050_CAL_STILL_DIFF) && (d0 >= -MPU6050_CAL_STILL_DIFF) &&
+            (d1 <= MPU6050_CAL_STILL_DIFF) && (d1 >= -MPU6050_CAL_STILL_DIFF) &&
+            (d2 <= MPU6050_CAL_STILL_DIFF) && (d2 >= -MPU6050_CAL_STILL_DIFF))
+        {
+            still_cnt++;
+        }
+        else
+        {
+            still_cnt = 0; // 晃了一下，重新计数
+        }
+
+        last_g[0] = raw.gx;
+        last_g[1] = raw.gy;
+        last_g[2] = raw.gz;
+        wait_cnt++;
+
+        IWDG_Port_Refresh();
+        DWT_Delay_ms(2);
+    }
 
     /* 丢弃前 100 组：等待滤波器收敛 */
     for (i = 0; i < 100; i++)

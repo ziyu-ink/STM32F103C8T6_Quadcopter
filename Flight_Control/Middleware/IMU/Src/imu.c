@@ -29,6 +29,7 @@ typedef struct
 static IMU_Quat_t s_quat = {1.0f, 0.0f, 0.0f, 0.0f};
 static IMU_Vec3_t s_gyro_integ_error = {0.0f, 0.0f, 0.0f}; // s_gyro_integ_error：误差积分状态
 static float s_norm_acc_z = 0.0f; // s_norm_acc_z：机体Z轴比力(LSB)
+static uint8_t s_tilt_init = 0; // s_tilt_init：1=四元数已按首帧加速度初始化
 
 /* 姿态解算单拍更新（四元数 + Mahony 互补滤波） */
 void IMU_Get_Angle(const MPU6050_Data_t *pMpu, IMU_Angle_t *pAngle, float dt)
@@ -36,6 +37,34 @@ void IMU_Get_Angle(const MPU6050_Data_t *pMpu, IMU_Angle_t *pAngle, float dt)
     if (NULL == pMpu || NULL == pAngle)
     {
         return;
+    }
+
+    /* 首次调用：用加速度把四元数直接初始化到当前倾角。
+       否则初值 0° 要按 Kp=0.8 的时间常数（约 1.25s）慢慢收敛，斜面开机要等 6~8s。 */
+    if (!s_tilt_init)
+    {
+        float acc_sq = SQUA(pMpu->ax) + SQUA(pMpu->ay) + SQUA(pMpu->az);
+        if (acc_sq > (4096.0f * 4096.0f)) /* 模值 >0.5g 才可信，自由落体/异常时等下一拍 */
+        {
+            float inv_n = 1.0f / sqrtf(acc_sq);
+            float ax = pMpu->ax * inv_n;
+            float ay = pMpu->ay * inv_n;
+            float az = pMpu->az * inv_n;
+            float pitch = Safe_Asin(-ax); /* 由 gravity_x = -sin(pitch) 反解 */
+            float roll = atan2f(ay, az);
+            float cr = cosf(roll * 0.5f), sr = sinf(roll * 0.5f);
+            float cp = cosf(pitch * 0.5f), sp = sinf(pitch * 0.5f);
+
+            s_quat.q0 = cr * cp;
+            s_quat.q1 = sr * cp;
+            s_quat.q2 = cr * sp;
+            s_quat.q3 = -sr * sp;
+
+            s_gyro_integ_error.x = 0.0f;
+            s_gyro_integ_error.y = 0.0f;
+            s_gyro_integ_error.z = 0.0f;
+            s_tilt_init = 1;
+        }
     }
 
     float half_dt = dt * 0.5f; // half_dt：半周期(s)

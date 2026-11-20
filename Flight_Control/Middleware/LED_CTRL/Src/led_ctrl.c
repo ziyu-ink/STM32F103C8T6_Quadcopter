@@ -20,8 +20,8 @@
 #define LED_DBL_ON2 2U
 // LED_DBL_OFF2：双闪长灭拍数
 #define LED_DBL_OFF2 10U
-// LED_STABILIZE_TICKS：上电稳定窗口拍数（20Hz × 8s），窗口内 4 灯流水提示姿态还在收敛
-#define LED_STABILIZE_TICKS 160U
+// LED_STABILIZE_TICKS：链路建立后的准备提示拍数（20Hz × 3s）；姿态已由上电初始化对齐，这里只做提示
+#define LED_STABILIZE_TICKS 60U
 // LED_STABILIZE_STEP：流水灯每颗 LED 保持的拍数（3 拍 = 150ms，整轮 600ms）
 #define LED_STABILIZE_STEP 3U
 
@@ -51,8 +51,8 @@ void LED_Ctrl_Update(void)
         s_tick = 0U;
     }
 
-    /* 上电计时：用于稳定窗口，饱和在窗口长度 */
-    if (s_boot_ticks < LED_STABILIZE_TICKS)
+    /* 上电计时：链路建立后才开始计，避免“等遥控”的慢闪把这个提示窗口吃掉 */
+    if (!Remote_Is_Link_Lost() && (s_boot_ticks < LED_STABILIZE_TICKS))
     {
         s_boot_ticks++;
     }
@@ -113,7 +113,7 @@ void LED_Ctrl_Update(void)
         return;
     }
 
-    /* 上电稳定窗口：姿态估计还在往重力收敛，4 灯流水提示“先别解锁” */
+    /* 链路刚建立的前 3 秒：4 灯流水提示“准备中”，与锁定快闪区分开 */
     if (!Remote_Is_Unlocked() && (s_boot_ticks < LED_STABILIZE_TICKS))
     {
         /* 每 LED_STABILIZE_STEP 拍换一颗灯：A → B → H → F 循环 */
