@@ -48,6 +48,10 @@ typedef enum
 #define CONTROL_FLOW_HIGH_MIN_MM 50.0f
 // CONTROL_HEIGHT_SLEW_MAX：高度slew限幅(cm/拍)
 #define CONTROL_HEIGHT_SLEW_MAX 3.0f
+// CONTROL_HEIGHT_HOLD_TICKS：激光失效后保持最后有效高度的拍数（10ms × 150 = 1.5s）
+#define CONTROL_HEIGHT_HOLD_TICKS 150U
+// CONTROL_HEIGHT_SWITCH_STEP：高度源切换/回切时的平滑步长（cm/拍，约 50cm/s）
+#define CONTROL_HEIGHT_SWITCH_STEP 0.5f
 // CONTROL_HEIGHT_GLITCH_PA：气压毛刺阈值(Pa)
 #define CONTROL_HEIGHT_GLITCH_PA 4.0f
 // CONTROL_HEIGHT_GLITCH_CNT：毛刺最大连续拍数
@@ -211,14 +215,31 @@ void Control_Height_Update(float dt)
         dt = 0.000001f;
     }
 
-    /* 高度源选择：窗口内光流优先，否则气压 */
-    if (Flow.ok && (Flow.flow_High > CONTROL_FLOW_HIGH_MIN_MM) && (Flow.flow_High < (float)CONTROL_FLOW_HIGH_VALID_MM))
+    /* 高度源：激光优先；失效时先保持最后有效值 1.5s，再用 50cm/s 平滑过渡到气压。
+       这样激光偶发丢帧不会让 control_high 瞬间跳几十厘米、把高度环打饱和。 */
     {
-        Control.control_high = Flow.flow_High / 10.0f;
-    }
-    else
-    {
-        Control.control_high = Control.baro_height;
+        static float s_laser_hold = 0.0f; // s_laser_hold：最后一次有效的激光高度(cm)
+        static uint16_t s_laser_lost = 0; // s_laser_lost：激光连续失效拍数
+        float target; // target：本拍的目标高度(cm)
+
+        if (Flow.ok && (Flow.flow_High > CONTROL_FLOW_HIGH_MIN_MM) && (Flow.flow_High < (float)CONTROL_FLOW_HIGH_VALID_MM))
+        {
+            s_laser_hold = Flow.flow_High / 10.0f;
+            s_laser_lost = 0;
+            target = s_laser_hold;
+        }
+        else if (s_laser_lost < CONTROL_HEIGHT_HOLD_TICKS)
+        {
+            s_laser_lost++;
+            target = s_laser_hold; /* 短时丢帧：沿用最后有效值 */
+        }
+        else
+        {
+            target = Control.baro_height; /* 长时间失效：改用气压 */
+        }
+
+        /* 平滑过渡：每拍最多走 CONTROL_HEIGHT_SWITCH_STEP cm */
+        Control.control_high += LIMIT(target - Control.control_high, -CONTROL_HEIGHT_SWITCH_STEP, CONTROL_HEIGHT_SWITCH_STEP);
     }
 
     /* slew 限幅：高度每拍最多 ±3cm */

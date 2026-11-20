@@ -244,8 +244,8 @@ void Control_Height_Calc(float yaw_deg, uint8_t dt_ms);
  * @brief  高度源选择 + 互补滤波估垂直速度 + 四态定高状态机
  * @param  dt  周期(s)，内部钳到 ≥1e-6
  * @retval 无
- * @note   1) 高度源选择：Flow.ok 且光流高度在 [50mm,4000mm] 内时优先用光流高度，
- *            否则用气压高度；
+ * @note   1) 高度源：光流高度在 [50mm,4000mm] 且 Flow.ok 时优先；失效时先保持最后
+ *            有效值 1.5s，之后以 50cm/s 平滑过渡到气压高度；
  *         2) slew 限幅：control_high 每拍最多 ±3cm（单位是"cm/拍"）；
  *         3) 互补滤波估垂直速度：
  *              measured = (measured + ∫a·dt)·0.98 + 0.02·Δh/Δt
