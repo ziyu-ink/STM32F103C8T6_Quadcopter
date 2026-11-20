@@ -15,6 +15,7 @@
 #include "led_ctrl.h"
 #include "eeprom_emu.h"
 #include "ano_param.h"
+#include "fw_version.h"
 #include <stdint.h>
 #include <stdio.h>
 
@@ -25,6 +26,9 @@ static SPL06_Calibration_t s_spl06_calib = {0}; // s_spl06_calib：SPL06 标定�
 uint8_t App_Init(void)
 {
     DWT_Init();
+
+    /* 上电横幅：版本号 + 构建时间，用来确认烧进去的是哪一版固件 */
+    printf("\r\n=== STM32F103C8T6 Quadcopter  FW v%s  built %s %s ===\r\n", FW_VERSION_STR, FW_BUILD_DATE, FW_BUILD_TIME);
 
     LED_Ctrl_Init();
 

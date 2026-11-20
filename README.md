@@ -109,7 +109,7 @@ ST HAL + CMSIS → TIMx->CCR / GPIOx->BSRR
 | 6 ms | 3 | `Task_6ms` | 四元数 + Mahony 姿态解算（全固件唯一写 `s_angle` 的地方） |
 | 10 ms | 5 | `Task_10ms` | 遥控解析、气压、光流、定点、高度、缓降、0x02 帧回发 |
 | 50 ms | 25 | `Task_50ms` | 电池低压迟滞判定、校准命令、LED 状态机 |
-| 1000 ms | 500 | `Task_1000ms` | 遥控帧数锁存、光流在线统计、`printf` 汇总 |
+| 1000 ms | 500 | `Task_1000ms` | 遥控帧数锁存、光流在线统计、`printf` 汇总（行尾 `fw=` 版本号） |
 
 节拍采用“跳过丢拍”策略：主循环卡顿 10 ms 只补执行 1 拍，不堆积任务。
 
@@ -169,6 +169,14 @@ cd Flight_Control
 cmake --preset Debug
 cmake --build --preset Debug
 ```
+
+上电（或复位）会先打印一行版本横幅：
+
+```
+=== STM32F103C8T6 Quadcopter  FW v0.10.0  built Nov 20 2026 13:2x:xx ===
+```
+
+版本号在 `Flight_Control/Middleware/APP/Inc/fw_version.h` 里手动维护，`built` 后面的日期和时间由编译器自动填入——两样一起看就能确认烧进去的是不是最新构建。1 秒调试行的行尾也有 `fw=`。
 
 产物是 `build/Debug/Flight_Control.elf`（以及 `.map`）。工程没有内置 objcopy 步骤，需要 `.bin` 自己转：
 
