@@ -122,6 +122,7 @@ typedef struct
     uint8_t descent_active; // 1=失联依据高度缓降中（混控改用 descent_thr 作基准）
     int16_t descent_thr; // 缓降油门基准（油门刻度，0~700 口径），由 control_descent 每 10ms 写
     uint8_t headless; // 1=无头模式（mode 层每拍同步 s_mode.headless，供 LED/遥测读）
+    uint8_t pos_hold; // 1=光流定点环正在接管水平姿态（0=摇杆直通，供 LED 读）
     uint8_t takeoff; // 1=一键起飞进行中
     uint8_t throw_active; // 1=抛飞进行中
     uint8_t flip_roll_active; // 1=前后翻滚中，跳过横滚外环

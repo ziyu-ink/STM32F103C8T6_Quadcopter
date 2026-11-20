@@ -151,14 +151,21 @@ void LED_Ctrl_Update(void)
         return;
     }
 
-    /* 无头全亮；有头 B+H 亮 */
+    /* 无头全亮；有头 B+H 亮，另用 A 表示光流定点是否在接管 */
     if (Control.headless)
     {
         LED_All_On();
     }
     else
     {
-        LED_Reset(LED_A);
+        if (Control.pos_hold)
+        {
+            LED_Set(LED_A); /* A 亮：光流定点环在管 */
+        }
+        else
+        {
+            LED_Reset(LED_A); /* A 灭：摇杆直通 */
+        }
         LED_Set(LED_B);
         LED_Set(LED_H);
         LED_Reset(LED_F);

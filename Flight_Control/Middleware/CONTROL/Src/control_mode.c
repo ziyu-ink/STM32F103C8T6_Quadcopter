@@ -465,6 +465,7 @@ static void Control_Position_Attitude(void)
         }
         else
         {
+            Control.pos_hold = 1; /* 光流定点环接管水平姿态 */
             Control.pid_pitch.desired = LIMIT(Control.pid_flow_speed_x.out * CONTROL_FLOW_SCALE, -CONTROL_FLOW_ANGLE_MAX, CONTROL_FLOW_ANGLE_MAX);
             Control.pid_roll.desired = -LIMIT(Control.pid_flow_speed_y.out * CONTROL_FLOW_SCALE, -CONTROL_FLOW_ANGLE_MAX, CONTROL_FLOW_ANGLE_MAX);
         }
@@ -506,6 +507,9 @@ void Control_Mode_Update(const MPU6050_Data_t *pMpu, const IMU_Angle_t *pAngle)
 
     /* 油门基准：遥控油门 - 低限 */
     thr_temp_old = Control.thr_temp = (int16_t)(Remote.thrust - CONTROL_CHAN_LOW);
+
+    /* 每拍先清“定点接管”标志，只有走光流环的分支才会置 1（供 LED 区分定点/直通） */
+    Control.pos_hold = 0;
 
     /* 分支调度：翻滚 > zdg > 无头 > 起飞 > 抛飞 > 定点 */
     if (s_flip.sumxy == Remote.aux2)
