@@ -33,12 +33,6 @@
 #define FLOW_ANG_2_RAD 0.0174f
 // FLOW_CALIB_HEIGHT_CM：标定高度 50cm
 #define FLOW_CALIB_HEIGHT_CM 50.0f
-// FLOW_HIGH_MIN_MM：激光高度有效下限（mm），低于此值退回标定高度
-#define FLOW_HIGH_MIN_MM 50.0f
-// FLOW_HIGH_MAX_MM：激光高度有效上限（mm），高于此值退回标定高度
-#define FLOW_HIGH_MAX_MM 4000.0f
-// FLOW_H_ALPHA：高度低通系数（10ms 一拍，时间常数约 95ms）
-#define FLOW_H_ALPHA 0.1f
 // FLOW_LSB_PER_RAD：光流灵敏度
 #define FLOW_LSB_PER_RAD 11.914f
 // FLOW_CM_PER_INCH：英寸转厘米
@@ -51,7 +45,6 @@ static uint8_t s_fault_cnt = 0; // 连续低质量帧计数（滞回用）
 
 static volatile uint8_t s_ssi_cnt = 0; // s_ssi_cnt：每秒有效帧计数
 static uint8_t s_ssi = 0; // s_ssi：上一秒帧数快照
-static float s_h_mm_lpf = 0.0f; // s_h_mm_lpf：激光高度低通值（mm），用于随高度换算 cpi
 
 Flow_t Flow = {0}; // Flow：光流原始数据
 Flow_Pixel_t Flow_Pixel = {0}; // Flow_Pixel：光流融合输出
@@ -191,25 +184,9 @@ void Pixel_Flow_Fix(float dT, const IMU_Angle_t *pAngle)
     Flow_Pixel.fix_x += (Flow_Pixel.x - Flow_Pixel.fix_x) * FLOW_SPD_ALPHA;
     Flow_Pixel.fix_y += (Flow_Pixel.y - Flow_Pixel.fix_y) * FLOW_SPD_ALPHA;
 
-    /* 尺度换算：cpi(cm/LSB) 随激光高度变化，保证不同高度下 loc 都是真实厘米；
-       激光无效（<50mm 或 >4000mm）时退回 50cm 标定值。高度先低通，避免增益抖动。 */
-    if ((Flow.flow_High > FLOW_HIGH_MIN_MM) && (Flow.flow_High < FLOW_HIGH_MAX_MM))
-    {
-        if (s_h_mm_lpf <= 0.0f)
-        {
-            s_h_mm_lpf = Flow.flow_High; /* 首次直接取当前高度 */
-        }
-        else
-        {
-            s_h_mm_lpf += (Flow.flow_High - s_h_mm_lpf) * FLOW_H_ALPHA;
-        }
-    }
-    else
-    {
-        s_h_mm_lpf = FLOW_CALIB_HEIGHT_CM * 10.0f; /* 50cm → 500mm */
-    }
-
-    cpi = ((s_h_mm_lpf * 0.001f) / FLOW_LSB_PER_RAD) * FLOW_CM_PER_INCH;
+    /* 尺度换算：按 50cm 标定高度换算 cpi(cm/LSB)，与厂家 flow.c 第 213 行一致
+       （厂家把“按实际高度换算”那行注释掉了，这里也固定 50cm）。 */
+    cpi = ((FLOW_CALIB_HEIGHT_CM * 0.01f) / FLOW_LSB_PER_RAD) * FLOW_CM_PER_INCH;
     Flow_Pixel.fix_High = cpi;
 
     /* 输出：轴向按模块安装约定交换 X/Y */

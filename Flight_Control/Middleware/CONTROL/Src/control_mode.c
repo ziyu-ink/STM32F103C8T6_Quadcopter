@@ -590,10 +590,13 @@ void Control_Mode_Update(const MPU6050_Data_t *pMpu, const IMU_Angle_t *pAngle)
         Control.height_lock = 0;
     }
 
-    /* 配平：trim 是姿态估计的零偏（测量 = 真实 + 偏置），所以期望角要“加上”偏置，
-       让 期望 == 测量 时飞机真正水平；写成减号会在所有模式里固定歪一个偏置量。 */
-    Control.pid_roll.desired += Control.trim_roll;
-    Control.pid_pitch.desired += Control.trim_pitch;
+    /* 配平：厂家定点环里没有 trim，所以光流接管时这里也不加，避免把位置环的
+       工作点整体推偏；摇杆直通/低空时仍然加上，用来压住固定偏置漂移。 */
+    if (!Control.pos_hold)
+    {
+        Control.pid_roll.desired += Control.trim_roll;
+        Control.pid_pitch.desired += Control.trim_pitch;
+    }
 
     Control.headless = s_mode.headless;
 }
