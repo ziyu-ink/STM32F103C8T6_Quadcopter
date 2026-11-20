@@ -173,10 +173,10 @@ cmake --build --preset Debug
 上电（或复位）会先打印一行版本横幅：
 
 ```
-=== STM32F103C8T6 Quadcopter  FW v0.10.0  built Nov 20 2026 13:2x:xx ===
+=== STM32F103C8T6 Quadcopter  FW v0.10.1 ===
 ```
 
-版本号在 `Flight_Control/Middleware/APP/Inc/fw_version.h` 里手动维护，`built` 后面的日期和时间由编译器自动填入——两样一起看就能确认烧进去的是不是最新构建。1 秒调试行的行尾也有 `fw=`。
+版本号在 `Flight_Control/Middleware/APP/Inc/fw_version.h` 里手动维护，改功能/修 bug 时递增；1 秒调试行的行尾也有 `fw=`。
 
 产物是 `build/Debug/Flight_Control.elf`（以及 `.map`）。工程没有内置 objcopy 步骤，需要 `.bin` 自己转：
 

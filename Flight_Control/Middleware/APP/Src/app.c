@@ -27,8 +27,8 @@ uint8_t App_Init(void)
 {
     DWT_Init();
 
-    /* 上电横幅：版本号 + 构建时间，用来确认烧进去的是哪一版固件 */
-    printf("\r\n=== STM32F103C8T6 Quadcopter  FW v%s  built %s %s ===\r\n", FW_VERSION_STR, FW_BUILD_DATE, FW_BUILD_TIME);
+    /* 上电横幅：打印固件版本号，用来确认烧进去的是哪一版 */
+    printf("\r\n=== STM32F103C8T6 Quadcopter  FW v%s ===\r\n", FW_VERSION_STR);
 
     LED_Ctrl_Init();
 
