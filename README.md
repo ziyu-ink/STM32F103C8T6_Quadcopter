@@ -158,6 +158,7 @@ m4 = base - rate_x - rate_y - rate_z
 | 配平·采样中 | 4 灯常亮 |
 | 配平·等待转身 | B+H 快闪（250 ms 周期） |
 | 配平·完成 | 4 灯快闪 2 秒 |
+| 配平·失败 | 4 灯 100 ms 急促闪 2 秒 |
 
 上电时四元数直接用首帧加速度初始化到当前倾角（tilt init），不再从 0° 慢慢爬；校准完成后的 3 秒流水只是“准备中”提示，之后没连上遥控就转慢闪、连上了就转锁定快闪。若去掉 tilt init，Mahony 的时间常数约 1.25 s，斜面开机要等 6~8 秒才收敛。
 
@@ -178,7 +179,7 @@ cmake --build --preset Debug
 上电（或复位）会先打印一行版本横幅：
 
 ```
-=== STM32F103C8T6 Quadcopter  FW v0.12.0 ===
+=== STM32F103C8T6 Quadcopter  FW v0.12.1 ===
 ```
 
 版本号在 `Flight_Control/Middleware/APP/Inc/fw_version.h` 里手动维护，改功能/修 bug 时递增；1 秒调试行的行尾也有 `fw=`。

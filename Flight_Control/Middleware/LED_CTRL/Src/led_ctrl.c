@@ -86,6 +86,18 @@ void LED_Ctrl_Update(void)
                 LED_All_Off();
             }
         }
+        else if (s_trim_phase == LED_TRIM_PHASE_FAIL)
+        {
+            /* 失败：4 灯 100ms 急促闪，和成功的 250ms 区分开 */
+            if (((s_tick / 2U) & 1U) == 0U)
+            {
+                LED_All_On();
+            }
+            else
+            {
+                LED_All_Off();
+            }
+        }
         else
         {
             /* 完成：4 灯快闪（250ms 周期），由 Control_Trim 在 2s 后恢复 */

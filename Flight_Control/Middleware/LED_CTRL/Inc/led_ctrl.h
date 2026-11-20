@@ -23,7 +23,8 @@
 #define LED_TRIM_PHASE_NONE 0U   // 无配平提示，走正常状态机
 #define LED_TRIM_PHASE_SAMPLE 1U // 采样中：4 灯常亮
 #define LED_TRIM_PHASE_ROTATE 2U // 等待转 180°：B+H 快闪
-#define LED_TRIM_PHASE_DONE 3U   // 完成：4 灯快闪
+#define LED_TRIM_PHASE_DONE 3U   // 完成：4 灯快闪（250ms）
+#define LED_TRIM_PHASE_FAIL 4U   // 失败：4 灯急促闪（100ms）
 
 /**
  * @brief  LED 控制模块上电初始化：全部熄灭

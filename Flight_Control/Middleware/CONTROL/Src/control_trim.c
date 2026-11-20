@@ -35,6 +35,7 @@ typedef enum
     TRIM_SETTLE2,     // 转身后稳一下
     TRIM_SAMPLE2,     // 第 2 面采样
     TRIM_DONE,        // 完成灯效
+    TRIM_FAIL,        // 失败灯效
 } Trim_State_t;
 
 static Trim_State_t s_state = TRIM_IDLE;
@@ -71,6 +72,14 @@ static void Trim_Reset(void)
     s_sum_p = 0.0f;
     s_rot = 0.0f;
     LED_Ctrl_Set_Trim_Phase(LED_TRIM_PHASE_NONE);
+}
+
+/* Trim_Fail：进入失败灯效（4 灯 100ms 急促闪 2s 后恢复） */
+static void Trim_Fail(void)
+{
+    s_cnt = 0U;
+    s_state = TRIM_FAIL;
+    LED_Ctrl_Set_Trim_Phase(LED_TRIM_PHASE_FAIL);
 }
 
 /* Control_Trim_Load：上电读配平值，无记录则清零 */
@@ -183,7 +192,7 @@ void Control_Trim_Update(const IMU_Angle_t *pAngle)
             else if (++s_cnt >= TRIM_ROTATE_TIMEOUT)
             {
                 printf("\r\n[trim] 15 秒内没检测到转身，本次作废\r\n");
-                Trim_Reset();
+                Trim_Fail();
             }
             break;
         }
@@ -215,7 +224,7 @@ void Control_Trim_Update(const IMU_Angle_t *pAngle)
                     (sum_p > TRIM_SANITY_DEG) || (sum_p < -TRIM_SANITY_DEG))
                 {
                     printf("\r\n[trim] 两次读数之和 %.2f/%.2f 过大，转角可能不对，本次作废\r\n", (double)sum_r, (double)sum_p);
-                    Trim_Reset();
+                    Trim_Fail();
                     break;
                 }
 
@@ -226,20 +235,27 @@ void Control_Trim_Update(const IMU_Angle_t *pAngle)
                     !EEPROM_Emu_Write(TRIM_EEPROM_PITCH, (uint16_t)(int16_t)(Control.trim_pitch * 100.0f)))
                 {
                     printf("\r\n[trim] EEPROM 写入失败，本次配平只在本次上电有效\r\n");
+                    Trim_Fail();
                 }
                 else
                 {
                     printf("\r\n[trim] 完成：roll=%+.2f  pitch=%+.2f（已存 EEPROM）\r\n",
                            (double)Control.trim_roll, (double)Control.trim_pitch);
+                    s_cnt = 0U;
+                    s_state = TRIM_DONE;
+                    LED_Ctrl_Set_Trim_Phase(LED_TRIM_PHASE_DONE);
                 }
-
-                s_cnt = 0U;
-                s_state = TRIM_DONE;
-                LED_Ctrl_Set_Trim_Phase(LED_TRIM_PHASE_DONE);
             }
             break;
 
         case TRIM_DONE:
+            if (++s_cnt >= TRIM_DONE_TICKS)
+            {
+                Trim_Reset();
+            }
+            break;
+
+        case TRIM_FAIL:
             if (++s_cnt >= TRIM_DONE_TICKS)
             {
                 Trim_Reset();
