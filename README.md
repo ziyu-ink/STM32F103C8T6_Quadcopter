@@ -181,7 +181,7 @@ cmake --build --preset Debug
 上电（或复位）会先打印一行版本横幅：
 
 ```
-=== STM32F103C8T6 Quadcopter  FW v0.12.2 ===
+=== STM32F103C8T6 Quadcopter  FW v0.12.4 ===
 ```
 
 版本号在 `Flight_Control/Middleware/APP/Inc/fw_version.h` 里手动维护，改功能/修 bug 时递增；1 秒调试行的行尾也有 `fw=`。
