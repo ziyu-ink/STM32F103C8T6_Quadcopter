@@ -28,6 +28,7 @@
 static uint8_t s_tick = 0; // s_tick：状态机拍计数
 static uint8_t s_dbl_phase = 0; // s_dbl_phase：双闪独立相位
 static uint16_t s_boot_ticks = 0; // s_boot_ticks：上电后已运行拍数，饱和到 LED_STABILIZE_TICKS
+static uint8_t s_trim_phase = 0; // s_trim_phase：配平测量提示阶段（0=正常状态机）
 
 /* LED_Ctrl_Init：上电先全灭 */
 void LED_Ctrl_Init(void)
@@ -39,6 +40,12 @@ void LED_Ctrl_Init(void)
 void LED_Ctrl_Set_Calibrating(void)
 {
     LED_All_On();
+}
+
+/* LED_Ctrl_Set_Trim_Phase：配平测量提示阶段，0 恢复正常状态机 */
+void LED_Ctrl_Set_Trim_Phase(uint8_t phase)
+{
+    s_trim_phase = phase;
 }
 
 /* LED_Ctrl_Update：状态机单拍（20Hz） */
@@ -55,6 +62,43 @@ void LED_Ctrl_Update(void)
     if (s_boot_ticks < LED_STABILIZE_TICKS)
     {
         s_boot_ticks++;
+    }
+
+    /* 配平测量提示：测量期间独占 4 灯，优先级最高 */
+    if (s_trim_phase != LED_TRIM_PHASE_NONE)
+    {
+        if (s_trim_phase == LED_TRIM_PHASE_SAMPLE)
+        {
+            LED_All_On(); /* 采样中：常亮 */
+        }
+        else if (s_trim_phase == LED_TRIM_PHASE_ROTATE)
+        {
+            /* 等待转身：B+H 快闪（250ms 周期） */
+            if (((s_tick / LED_FAST_TICKS) & 1U) == 0U)
+            {
+                LED_Reset(LED_A);
+                LED_Set(LED_B);
+                LED_Set(LED_H);
+                LED_Reset(LED_F);
+            }
+            else
+            {
+                LED_All_Off();
+            }
+        }
+        else
+        {
+            /* 完成：4 灯快闪（250ms 周期），由 Control_Trim 在 2s 后恢复 */
+            if (((s_tick / LED_FAST_TICKS) & 1U) == 0U)
+            {
+                LED_All_On();
+            }
+            else
+            {
+                LED_All_Off();
+            }
+        }
+        return;
     }
 
     /* 失控锁定：急闪 */

@@ -1,11 +1,14 @@
 #ifndef __LED_CTRL_H__
 #define __LED_CTRL_H__
 
+#include <stdint.h>
+
 /*
  * LED_CTRL 模块：飞控状态灯效控制（Middleware 层）。
  * 状态机（优先级从高到低）：
  *   初始化失败 → 4 灯 100ms 亮灭交替（死循环内，由 Error_Handler 调用）
  *   校准中     → 4 灯常亮（App_Init 期间）
+ *   配平测量   → 由 Control_Trim 设置：采样中 4 灯常亮、等待转身 B+H 快闪、完成 4 灯快闪
  *   失控锁定   → 急闪 300ms 周期（Remote_Is_Failsafe_Locked）
  *   上电准备中 → 4 灯流水 600ms 一轮（上电 3s 内且未解锁）
  *   链路丢失   → 慢闪 2s 周期（Remote_Is_Link_Lost）
@@ -15,6 +18,12 @@
  *   解锁·有头  → B+H 亮；A 亮=光流定点接管，A 灭=摇杆直通
  * 调用节拍：Task_50ms（20Hz），内部用计数器分频出上表的各档周期。
  */
+
+/* 配平测量提示阶段（Control_Trim 通过 LED_Ctrl_Set_Trim_Phase 设置） */
+#define LED_TRIM_PHASE_NONE 0U   // 无配平提示，走正常状态机
+#define LED_TRIM_PHASE_SAMPLE 1U // 采样中：4 灯常亮
+#define LED_TRIM_PHASE_ROTATE 2U // 等待转 180°：B+H 快闪
+#define LED_TRIM_PHASE_DONE 3U   // 完成：4 灯快闪
 
 /**
  * @brief  LED 控制模块上电初始化：全部熄灭
@@ -35,6 +44,15 @@ void LED_Ctrl_Init(void);
  *         或在校准结束后再恢复。
  */
 void LED_Ctrl_Set_Calibrating(void);
+
+/**
+ * @brief  设置配平测量提示阶段（覆盖正常状态机，优先级最高）
+ * @param  phase LED_TRIM_PHASE_xxx
+ * @retval 无
+ * @note   传 LED_TRIM_PHASE_NONE 恢复正常状态机。地面测量期间使用，
+ *         测量结束/取消后 Control_Trim 会恢复为 NONE。
+ */
+void LED_Ctrl_Set_Trim_Phase(uint8_t phase);
 
 /**
  * @brief  LED 状态机单拍更新（建议 50ms 周期调用，即 20Hz）

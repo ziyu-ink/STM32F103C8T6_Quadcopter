@@ -3,6 +3,7 @@
 #include "ano_dt.h"
 #include "remote.h"
 #include "eeprom_emu.h"
+#include "led_ctrl.h"
 #include <stdio.h>
 #include <stdint.h>
 
@@ -15,9 +16,12 @@
 #define TRIM_STICK_LOW 1100
 
 /* 采样时序（10ms 一拍） */
-#define TRIM_SETTLE_TICKS 100U // 进入后先稳 1s
-#define TRIM_SAMPLE_TICKS 200U // 每面采 2s
-#define TRIM_ROTATE_TICKS 300U // 留给"转 180°"的时间 3s
+#define TRIM_SETTLE_TICKS 100U  // 进入后先稳 1s
+#define TRIM_SAMPLE_TICKS 200U  // 每面采 2s
+#define TRIM_SETTLE2_TICKS 50U  // 转身到位后再稳 0.5s
+#define TRIM_ROTATE_DEG 150.0f  // 累计转过 150° 就认为“转到位”
+#define TRIM_ROTATE_TIMEOUT 1500U // 15s 还没转够就放弃
+#define TRIM_DONE_TICKS 40U     // 完成后灯效保持 2s
 
 /* 两次读数之和的合理上限：转得接近 180° 时，和里只剩 2×偏置，应该很小 */
 #define TRIM_SANITY_DEG 10.0f
@@ -27,8 +31,10 @@ typedef enum
     TRIM_IDLE = 0,    // 等手势
     TRIM_SETTLE1,     // 第 1 面稳一下
     TRIM_SAMPLE1,     // 第 1 面采样
-    TRIM_WAIT_ROTATE, // 等用户转 180°
+    TRIM_ROTATE,      // 等用户原地转 180°（自检测）
+    TRIM_SETTLE2,     // 转身后稳一下
     TRIM_SAMPLE2,     // 第 2 面采样
+    TRIM_DONE,        // 完成灯效
 } Trim_State_t;
 
 static Trim_State_t s_state = TRIM_IDLE;
@@ -38,6 +44,34 @@ static float s_sum_r = 0.0f;    // s_sum_r：本面横滚累加
 static float s_sum_p = 0.0f;    // s_sum_p：本面俯仰累加
 static float s_avg1_r = 0.0f;   // s_avg1_r：第 1 面横滚均值
 static float s_avg1_p = 0.0f;   // s_avg1_p：第 1 面俯仰均值
+static float s_rot = 0.0f;      // s_rot：转身过程累计角度（度）
+static float s_last_yaw = 0.0f; // s_last_yaw：上一拍偏航角
+
+/* Trim_Wrap180：把角度差折到 [-180, 180] */
+static float Trim_Wrap180(float a)
+{
+    while (a > 180.0f)
+    {
+        a -= 360.0f;
+    }
+    while (a < -180.0f)
+    {
+        a += 360.0f;
+    }
+    return a;
+}
+
+/* Trim_Reset：回到空闲并恢复灯语 */
+static void Trim_Reset(void)
+{
+    s_state = TRIM_IDLE;
+    s_cnt = 0U;
+    s_sample = 0U;
+    s_sum_r = 0.0f;
+    s_sum_p = 0.0f;
+    s_rot = 0.0f;
+    LED_Ctrl_Set_Trim_Phase(LED_TRIM_PHASE_NONE);
+}
 
 /* Control_Trim_Load：上电读配平值，无记录则清零 */
 void Control_Trim_Load(void)
@@ -64,16 +98,6 @@ void Control_Trim_Load(void)
 uint8_t Control_Trim_Is_Active(void)
 {
     return (s_state != TRIM_IDLE) ? 1U : 0U;
-}
-
-/* Trim_Reset：回到空闲 */
-static void Trim_Reset(void)
-{
-    s_state = TRIM_IDLE;
-    s_cnt = 0U;
-    s_sample = 0U;
-    s_sum_r = 0.0f;
-    s_sum_p = 0.0f;
 }
 
 /* Control_Trim_Update：手势检测 + 两面采样 + 保存，10ms 一拍 */
@@ -103,6 +127,7 @@ void Control_Trim_Update(const IMU_Angle_t *pAngle)
                 {
                     s_cnt = 0U;
                     s_state = TRIM_SETTLE1;
+                    LED_Ctrl_Set_Trim_Phase(LED_TRIM_PHASE_SAMPLE);
                     printf("\r\n[trim] 第 1 面：保持静止，采集中...\r\n");
                 }
             }
@@ -130,14 +155,41 @@ void Control_Trim_Update(const IMU_Angle_t *pAngle)
             {
                 s_avg1_r = s_sum_r / (float)s_sample;
                 s_avg1_p = s_sum_p / (float)s_sample;
+
+                /* 进入转身等待：清零累计角，灯语切到"转身提示" */
+                s_rot = 0.0f;
+                s_last_yaw = pAngle->yaw;
                 s_cnt = 0U;
-                s_state = TRIM_WAIT_ROTATE;
-                printf("\r\n[trim] 请原地转 180 度（机身绕竖轴转半圈），然后保持静止...\r\n");
+                s_state = TRIM_ROTATE;
+                LED_Ctrl_Set_Trim_Phase(LED_TRIM_PHASE_ROTATE);
+                printf("\r\n[trim] 请原地转 180 度（机身绕竖轴转半圈），转到位会自动继续...\r\n");
             }
             break;
 
-        case TRIM_WAIT_ROTATE:
-            if (++s_cnt >= TRIM_ROTATE_TICKS)
+        case TRIM_ROTATE:
+        {
+            /* 自检测：累计转过的角度（不分方向），够 150° 就认为转到位 */
+            float d = Trim_Wrap180(pAngle->yaw - s_last_yaw);
+            s_last_yaw = pAngle->yaw;
+            s_rot += (d >= 0.0f) ? d : -d;
+
+            if (s_rot >= TRIM_ROTATE_DEG)
+            {
+                s_cnt = 0U;
+                s_state = TRIM_SETTLE2;
+                LED_Ctrl_Set_Trim_Phase(LED_TRIM_PHASE_SAMPLE);
+                printf("\r\n[trim] 检测到已转身，保持静止...\r\n");
+            }
+            else if (++s_cnt >= TRIM_ROTATE_TIMEOUT)
+            {
+                printf("\r\n[trim] 15 秒内没检测到转身，本次作废\r\n");
+                Trim_Reset();
+            }
+            break;
+        }
+
+        case TRIM_SETTLE2:
+            if (++s_cnt >= TRIM_SETTLE2_TICKS)
             {
                 s_cnt = 0U;
                 s_sample = 0U;
@@ -180,6 +232,16 @@ void Control_Trim_Update(const IMU_Angle_t *pAngle)
                     printf("\r\n[trim] 完成：roll=%+.2f  pitch=%+.2f（已存 EEPROM）\r\n",
                            (double)Control.trim_roll, (double)Control.trim_pitch);
                 }
+
+                s_cnt = 0U;
+                s_state = TRIM_DONE;
+                LED_Ctrl_Set_Trim_Phase(LED_TRIM_PHASE_DONE);
+            }
+            break;
+
+        case TRIM_DONE:
+            if (++s_cnt >= TRIM_DONE_TICKS)
+            {
                 Trim_Reset();
             }
             break;
