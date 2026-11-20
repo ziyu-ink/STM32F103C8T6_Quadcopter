@@ -51,8 +51,8 @@ void LED_Ctrl_Update(void)
         s_tick = 0U;
     }
 
-    /* 上电计时：链路建立后才开始计，避免“等遥控”的慢闪把这个提示窗口吃掉 */
-    if (!Remote_Is_Link_Lost() && (s_boot_ticks < LED_STABILIZE_TICKS))
+    /* 上电计时：前 3 秒固定显示“准备中”，与遥控是否连上无关 */
+    if (s_boot_ticks < LED_STABILIZE_TICKS)
     {
         s_boot_ticks++;
     }
@@ -67,6 +67,30 @@ void LED_Ctrl_Update(void)
         else
         {
             LED_All_Off();
+        }
+        return;
+    }
+
+    /* 上电前 3 秒：4 灯流水提示“校准完成、准备中”，优先于等遥控慢闪 */
+    if (!Remote_Is_Unlocked() && (s_boot_ticks < LED_STABILIZE_TICKS))
+    {
+        /* 每 LED_STABILIZE_STEP 拍换一颗灯：A → B → H → F 循环 */
+        uint8_t phase = (uint8_t)((s_tick / LED_STABILIZE_STEP) & 0x03U);
+        LED_All_Off();
+        switch (phase)
+        {
+            case 0U:
+                LED_Set(LED_A);
+                break;
+            case 1U:
+                LED_Set(LED_B);
+                break;
+            case 2U:
+                LED_Set(LED_H);
+                break;
+            default:
+                LED_Set(LED_F);
+                break;
         }
         return;
     }
@@ -109,30 +133,6 @@ void LED_Ctrl_Update(void)
         else
         {
             LED_All_Off();
-        }
-        return;
-    }
-
-    /* 链路刚建立的前 3 秒：4 灯流水提示“准备中”，与锁定快闪区分开 */
-    if (!Remote_Is_Unlocked() && (s_boot_ticks < LED_STABILIZE_TICKS))
-    {
-        /* 每 LED_STABILIZE_STEP 拍换一颗灯：A → B → H → F 循环 */
-        uint8_t phase = (uint8_t)((s_tick / LED_STABILIZE_STEP) & 0x03U);
-        LED_All_Off();
-        switch (phase)
-        {
-            case 0U:
-                LED_Set(LED_A);
-                break;
-            case 1U:
-                LED_Set(LED_B);
-                break;
-            case 2U:
-                LED_Set(LED_H);
-                break;
-            default:
-                LED_Set(LED_F);
-                break;
         }
         return;
     }
