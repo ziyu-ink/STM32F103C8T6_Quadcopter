@@ -181,7 +181,7 @@ cmake --build --preset Debug
 上电（或复位）会先打印一行版本横幅：
 
 ```
-=== STM32F103C8T6 Quadcopter  FW v0.12.2 ===
+=== STM32F103C8T6 Quadcopter  FW v0.12.3 ===
 ```
 
 版本号在 `Flight_Control/Middleware/APP/Inc/fw_version.h` 里手动维护，改功能/修 bug 时递增；1 秒调试行的行尾也有 `fw=`。
@@ -224,7 +224,7 @@ arm-none-eabi-objcopy -O binary build/Debug/Flight_Control.elf build/Debug/Fligh
 - `Control_Init()` 只写增益和业务标志，**不清 PID 内部状态**（`integ / prevError / out`）；要在解锁那一拍靠 `PID_Reset` 统一清零。
 - `IMU_Get_Angle` 的 `dt` 必须与 6 ms 真实周期一致，否则积分增益和收敛速度都会偏。
 - 光流 `loc_x` 来自 `out_y_i`、`loc_y` 来自 `out_x_i`（模块安装方向决定），不要“顺手改正”。
-- 光流 `cpi` 随激光高度（50~4000 mm）换算，保证不同高度下 `loc` 都是真实厘米；激光无效时退回 50 cm 标定值。高度先做低通再算，避免增益抖动。
+- 光流 `cpi` 固定按 50 cm 标定高度换算（≈0.1066 cm/LSB）：实测激光高度在飞行中会跳变（40→120 cm），拿它算 cpi 会让位置环增益忽大忽小，等高度源稳定后再改回随高度换算。
 - 姿态的“水平”参考由首帧加速度直接初始化、之后由 Mahony 用重力持续修正，开机只要求静止、不要求放平；加计 `ax/ay` 的固定残余（芯片零偏 + 安装倾斜）由遥控器微调补偿。
 - **低空地面效应**：离地一个桨径（5 寸约 12.7 cm）以内，推力变大、气压高度被桨流污染、光流位移失真；20 cm 以下没有光流定点，只剩姿态保持，0.5° 的固定偏置就会变成漂移。起降时快速通过低空段、别在 20 cm 以下悬停/定点，气压计加海绵隔离，桨先做平衡。
 
