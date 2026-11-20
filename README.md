@@ -2,7 +2,7 @@
 
 一块 **STM32F103C8T6** 上的裸机四轴飞行控制固件：没有 RTOS，主循环跑一次 2ms 节拍切出 6 档任务，三组串级 PID 把遥控杆量算成四路 PWM 占空比。
 
-配套的**单文件可视化文档**（11 张图，离线可看）：[`flight-control-index.html`](./flight-control-index.html)
+配套的**单文件可视化文档**（11 张图，离线可看）：[`飞控代码可视化文档.html`](./飞控代码可视化文档.html)
 
 > 手机上看：下载上面那个文件用浏览器打开，双指放大或横屏更清楚。
 
@@ -11,7 +11,7 @@
 ## 这个仓库是什么
 
 - **固件**：`Flight_Control/`，CMake + STM32CubeMX 工程，可直接编译烧录。
-- **可视化文档**：`flight-control-index.html`，把固件拆成 7 节 11 张图（模块关系、6 档节拍时序、生命周期、阅读路线、数据结构、函数调用链、分层架构）。每张图里点节点能看到 `文件:行号` 来源。
+- **可视化文档**：`飞控代码可视化文档.html`，把固件拆成 7 节 11 张图（模块关系、6 档节拍时序、生命周期、阅读路线、数据结构、函数调用链、分层架构）。每张图里点节点能看到 `文件:行号` 来源。
 - **设计说明**：`Flight_Control.xmind`，记录**为什么这么写**——CubeMX 的 11 步配置（含不能用硬件 I2C1 的 ST 勘误）、构建模式取舍、每个模块的设计意图。
 - **规划中的内容**：遥控器固件、原理图、PCB、学习笔记（见文末「路线图」）。
 
@@ -28,7 +28,7 @@
 | 层 | 材料 | 回答的问题 |
 |---|---|---|
 | **为什么这么设计** | `Flight_Control.xmind` | 为什么用 DWT 不用 SysTick？为什么不用硬件 I2C1？64KB 装不下时改什么？ |
-| **模块怎么连** | [`flight-control-index.html`](./flight-control-index.html) | 谁给谁送数据、6 档节拍里谁先谁后、状态怎么迁移、一层怎么拼到另一层 |
+| **模块怎么连** | [`飞控代码可视化文档.html`](./飞控代码可视化文档.html) | 谁给谁送数据、6 档节拍里谁先谁后、状态怎么迁移、一层怎么拼到另一层 |
 | **具体怎么算** | 源码里的逐行注释 | 每个函数的边界条件、状态迁移条件、公式与阈值从哪来 |
 
 建议的顺序：**先看 xmind 知道“为什么” → 再看页面知道“谁跟谁连” → 最后读代码看“一行一行怎么算”**。
@@ -41,7 +41,7 @@
 
 ```
 STM32F103C8T6_Quadcopter/
-├── flight-control-index.html   可视化文档：怎么连（7 张图，自包含 12 MB）
+├── 飞控代码可视化文档.html   可视化文档：怎么连（7 张图，自包含 12 MB）
 ├── Flight_Control.xmind        设计说明：为什么这么写（需 XMind 打开）
 └── Flight_Control/             固件工程
     ├── Core/                   CubeMX 生成：main.c、时钟、各外设 Init、中断（23 个文件）
@@ -192,7 +192,7 @@ arm-none-eabi-objcopy -O binary build/Debug/Flight_Control.elf build/Debug/Fligh
 5. `Middleware/CONTROL/Src/control_attitude.c` → `control_mixer.c` — 串级怎么串、四路怎么算。
 6. `Driver/MOTOR/Src/motor.c` → `HALPort/PWM_PORT/Src/pwm_port.c` → `Core/Src/tim.c` — 最短的一条“到底”链：`duty → 通道映射 → __HAL_TIM_SET_COMPARE → TIM2->CCR1`。
 
-更细的路线（13 步）和逐图讲解都在[可视化文档](./flight-control-index.html)里。
+更细的路线（13 步）和逐图讲解都在[可视化文档](./飞控代码可视化文档.html)里。
 
 ### 想自己从零搭一遍？
 
@@ -209,7 +209,8 @@ arm-none-eabi-objcopy -O binary build/Debug/Flight_Control.elf build/Debug/Fligh
 - `IMU_Get_Angle` 的 `dt` 必须与 6 ms 真实周期一致，否则积分增益和收敛速度都会偏。
 - 光流 `loc_x` 来自 `out_y_i`、`loc_y` 来自 `out_x_i`（模块安装方向决定），不要“顺手改正”。
 - 光流 `cpi` 固定按 50 cm 高度换算，不随实测高度变化：飞得越高，位置环的等效增益越小（100 cm 处约减半），手感会随高度变“软”。
-- 姿态的“水平”参考由 Mahony 用重力持续建立，开机只要求静止、不要求放平；加计 `ax/ay` 的固定残余（芯片零偏 + 安装倾斜）由遥控器微调补偿。
+- 姿态的“水平”参考由首帧加速度直接初始化、之后由 Mahony 用重力持续修正，开机只要求静止、不要求放平；加计 `ax/ay` 的固定残余（芯片零偏 + 安装倾斜）由遥控器微调补偿。
+- **低空地面效应**：离地一个桨径（5 寸约 12.7 cm）以内，推力变大、气压高度被桨流污染、光流位移失真；20 cm 以下没有光流定点，只剩姿态保持，0.5° 的固定偏置就会变成漂移。起降时快速通过低空段、别在 20 cm 以下悬停/定点，气压计加海绵隔离，桨先做平衡。
 
 ---
 
