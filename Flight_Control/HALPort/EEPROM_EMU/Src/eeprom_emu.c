@@ -25,7 +25,7 @@
 
 /* 虚拟地址数量 */
 // NUMB_OF_VAR：虚拟地址数量
-#define NUMB_OF_VAR 24U
+#define NUMB_OF_VAR 26U
 
 /* 页首 16bit 之后，每个变量占 4 字节（virt_addr + data），第 0 个变量在页首+2 */
 // FIRST_VAR_OFFSET：首个变量槽偏移

@@ -102,6 +102,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Middleware/CONTROL/Src/control_descent.c
     Middleware/CONTROL/Src/control_mode.c
     Middleware/CONTROL/Src/control_position.c
+    Middleware/CONTROL/Src/control_trim.c
 
     # ── 阶段 12：参数 / 灯语 / 调度 / 装配（6 档节拍跑起来、上电自检通过）
     Middleware/ANO_PARAM/Src/ano_param.c

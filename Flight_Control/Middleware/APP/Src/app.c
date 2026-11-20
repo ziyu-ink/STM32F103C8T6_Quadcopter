@@ -16,6 +16,7 @@
 #include "eeprom_emu.h"
 #include "ano_param.h"
 #include "fw_version.h"
+#include "control_trim.h"
 #include <stdint.h>
 #include <stdio.h>
 
@@ -124,6 +125,9 @@ uint8_t App_Init(void)
             }
         }
     }
+
+    /* 读入已保存的配平值（原地转 180° 测得），失败则按 0 处理 */
+    Control_Trim_Load();
 
     /* 电池 ADC 与调度器启动 */
     Battery_Init();

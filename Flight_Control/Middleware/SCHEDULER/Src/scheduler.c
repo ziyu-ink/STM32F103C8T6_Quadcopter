@@ -11,6 +11,7 @@
 #include "flow.h"
 #include "spl06.h"
 #include "fw_version.h"
+#include "control_trim.h"
 #include "battery.h"
 #include "led_ctrl.h"
 #include <stdint.h>
@@ -184,6 +185,7 @@ static void Task_10ms(void)
 {
     Remote_Analy();
     Control_Attitude_Yaw_Trim();
+    Control_Trim_Update(&s_angle);
 
     if (Remote_Take_Nrf_Reset())
     {

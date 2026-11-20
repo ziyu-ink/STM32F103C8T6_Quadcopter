@@ -6,7 +6,8 @@
 /*
  * EEPROM_EMU 模块：内部 Flash 模拟 EEPROM（HALPort 层，仅用 HAL Flash API）。
  * 载体：Flash 最后两页（Page62/Page63，各 1KB），磨损均衡轮换。
- * 容量：24 个虚拟地址（0x00~0x17），每个存 1 个 uint16_t。
+ * 容量：26 个虚拟地址（0x00~0x19），每个存 1 个 uint16_t。
+ *       0~23 给 8 组 PID，24/25 给配平值（横滚/俯仰 ×100）。
  * 掉电恢复：EE_Init 修复半写状态；写满自动搬运到另一页。
  */
 
