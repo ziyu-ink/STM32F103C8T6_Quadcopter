@@ -213,7 +213,7 @@
       <figcaption>
         <span><span class="tag ok">源码确证</span><b>讲什么：</b>遥控器 → NRF24L01 → ANO_DT → 解锁与失控保护 → 模式状态机这条设定链；姿态环（角度外环 kp 5.0 → 角速度内环）、高度环（位置环 → 速度环）、光流环（位置环 → 速度环）三条环；以及三条环与失联缓降如何一起汇进混控、再写成 TIM2/3 的四路 PWM。</span>
         <span><b>用到：</b><code>ANO_DT</code>、<code>REMOTE</code>、<code>control_mode.c</code>、<code>control_attitude.c</code>、<code>control_height.c</code>、<code>control_position.c</code>、<code>control_descent.c</code>、<code>control_mixer.c</code>、<code>FLOW</code>、<code>IMU</code>、<code>MPU6050</code>、<code>SPL06</code>、<code>PWM_PORT</code>。</span>
-        <span><span class="tag calc">一处简写</span><b>口径：</b>光流速度环那条「期望角 ±15°」实际不是直接进角度环——它先在 <code>control_mode.c</code> 的 <code>Control_Position_Attitude()</code> 里被换算成期望倾角，再交给外环。图上为少画一层用了简写，卡片里有说明。</span>
+        <span><span class="tag calc">一处简写</span><b>口径：</b>光流速度环那条「期望角 ±10°」实际不是直接进角度环——它先在 <code>control_mode.c</code> 的 <code>Control_Position_Attitude()</code> 里被换算成期望倾角，再交给外环。图上为少画一层用了简写，卡片里有说明。</span>
       </figcaption>
     </figure>
   </section>

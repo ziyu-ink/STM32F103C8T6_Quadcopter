@@ -62,8 +62,8 @@
 #define CONTROL_STICK_DEADBAND 150 // 定点模式摇杆死区（±150）
 #define CONTROL_STICK_SCALE 0.04f // 摇杆偏差→期望角：±500→±20°
 #define CONTROL_CAREFREE_SCALE 1.50f // 无头模式期望角放大倍数
-#define CONTROL_FLOW_SCALE 0.1f // 光流速度输出→期望角
-#define CONTROL_FLOW_ANGLE_MAX 15.0f // 光流修正角限幅（±15°）
+#define CONTROL_FLOW_SCALE 0.06f // 光流速度输出→期望角（厂家 0.1，这里调小以缓和漂移时的饱和）
+#define CONTROL_FLOW_ANGLE_MAX 10.0f // 光流修正角限幅（±10°，厂家 15°）
 #define CONTROL_FLOW_HIGH_MIN 20.0f // 光流定点最低高度（cm）
 #define CONTROL_FLOW_HIGH_MAX 400.0f // 光流定点最高高度（cm）
 

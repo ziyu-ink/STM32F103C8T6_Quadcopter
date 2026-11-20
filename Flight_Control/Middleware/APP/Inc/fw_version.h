@@ -7,6 +7,6 @@
  * 规则：改功能 / 修 bug 时手动递增 FW_VERSION_STR（主版本.次版本.修订号）。
  */
 
-#define FW_VERSION_STR "0.12.5"
+#define FW_VERSION_STR "0.13.0"
 
 #endif // __FW_VERSION_H__
