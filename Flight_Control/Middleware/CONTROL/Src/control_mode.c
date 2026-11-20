@@ -590,9 +590,10 @@ void Control_Mode_Update(const MPU6050_Data_t *pMpu, const IMU_Angle_t *pAngle)
         Control.height_lock = 0;
     }
 
-    /* 配平：所有分支的期望角统一减去机体固定偏置（原地转 180° 测得，存 EEPROM） */
-    Control.pid_roll.desired -= Control.trim_roll;
-    Control.pid_pitch.desired -= Control.trim_pitch;
+    /* 配平：trim 是姿态估计的零偏（测量 = 真实 + 偏置），所以期望角要“加上”偏置，
+       让 期望 == 测量 时飞机真正水平；写成减号会在所有模式里固定歪一个偏置量。 */
+    Control.pid_roll.desired += Control.trim_roll;
+    Control.pid_pitch.desired += Control.trim_pitch;
 
     Control.headless = s_mode.headless;
 }

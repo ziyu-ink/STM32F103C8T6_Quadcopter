@@ -403,7 +403,7 @@
           <tr><td>CONTROL_MOTOR_LIMIT</td><td class="num">1000</td><td>单路输出上限 = 一个 PWM 周期</td></tr>
           <tr><td>REMOTE_ARM_LOW / HIGH</td><td class="num">1150 / 1800</td><td>解锁三步的油门门限</td></tr>
           <tr><td>REMOTE_LOST_TICKS</td><td class="num">300</td><td>300×10ms = 3s 判失控</td></tr>
-          <tr><td>DESC_ENTER_CM / TOUCH_CM</td><td class="num">20 / 12</td><td>进入缓降最低高度 / 触地判定高度</td></tr>
+          <tr><td>DESC_ENTER_CM / TOUCH_CM / LOCK_CM</td><td class="num">20 / 12 / 4</td><td>进入缓降最低高度 / 低空软着陆起点 / 真正上锁高度</td></tr>
           <tr><td>DESC_TIMEOUT_CNT</td><td class="num">6000</td><td>6000×10ms = 60s 缓降超时强制上锁</td></tr>
           <tr><td>CONTROL_FLIP_TIMEOUT</td><td class="num">333</td><td>翻滚总拍数上限（75+58+200）</td></tr>
           <tr><td>TRIM_ROTATE_DEG</td><td class="num">150</td><td>配平转身自检测：累计转角到此值即继续第 2 面</td></tr>
@@ -567,7 +567,7 @@
       <li><b>原理</b>：地面倾斜在机体上的投影 S 跟着地面走，机体偏置 B 跟着机体走。第一次读数 S+B，原地转 180° 后变成 −S+B，平均就是 B。</li>
       <li><b>触发</b>：未解锁时四个摇杆同时拉到最低，保持 2 秒（<code>control_trim.c</code>）。</li>
       <li><b>流程</b>：4 灯常亮采 2 秒 → B+H 快闪提示转身 → 累计转角 ≥150° 自动继续（15 秒没转够作废）→ 再采 2 秒 → 4 灯快闪提示完成；失败（超时 / 转角不对 / 写 EEPROM 失败）时 4 灯 100 ms 急促闪 2 秒。</li>
-      <li><b>存储</b>：EEPROM 虚拟地址 24/25（单位 0.01°），上电打印 <code>[trim] loaded …</code>；所有模式的期望角都减去它，换场地不用重测。</li>
+      <li><b>存储</b>：EEPROM 虚拟地址 24/25（单位 0.01°），上电打印 <code>[trim] loaded …</code>；所有模式的期望角都<strong>加上</strong>它（读数 = 真实 + 偏置，加上后 期望 == 读数 才是真正水平），换场地不用重测。</li>
     </ol>
 
     <h3>算法索引：想学某个算法，去哪个文件</h3>

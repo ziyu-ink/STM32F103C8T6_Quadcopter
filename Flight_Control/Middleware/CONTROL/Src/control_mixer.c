@@ -56,8 +56,9 @@ void Control_Mixer_Update(void)
                 }
             }
 
-            /* 地面保护：低油门且非起飞/抛飞时四路清零 */
-            if (Remote.thrust < CONTROL_THR_CUT && Control.takeoff == 0 && Control.throw_active == 0)
+            /* 地面保护：低油门且非起飞/抛飞/缓降时四路清零
+               （缓降期间油门本来就低，不能把正在降落的电机切掉） */
+            if (Remote.thrust < CONTROL_THR_CUT && Control.takeoff == 0 && Control.throw_active == 0 && Control.descent_active == 0)
             {
                 m1 = m2 = m3 = m4 = 0;
                 break;

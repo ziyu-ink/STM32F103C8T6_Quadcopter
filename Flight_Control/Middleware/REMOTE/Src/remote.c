@@ -187,8 +187,13 @@ void Remote_Analy(void)
 
         if (s_lost_cnt < REMOTE_LOST_TICKS)
         {
-            /* 失联计时推进：未满 3s */
+            /* 失联计时推进：未满 3s；超过 0.5s 就把油门压到中位以下，禁止继续爬升 */
             s_lost_cnt++;
+            if ((s_lost_cnt >= REMOTE_LINK_LOST_TICKS) && (Remote.thrust > REMOTE_CENTER))
+            {
+                Remote.thrust = REMOTE_CENTER;
+                s_thr_step = 0;
+            }
         }
         else
         {
@@ -212,9 +217,8 @@ void Remote_Analy(void)
                 s_lost_cnt = REMOTE_LOST_HOLD;
                 if (s_descent_hold)
                 {
-                    /* 缓降接管：油门冻在中位 */
-                    Remote.thrust = REMOTE_CENTER;
-                    s_thr_step    = 0;
+                    /* 缓降接管：油门由缓降环决定，这里不要再抬到中位（会把飞机拉起来） */
+                    s_thr_step = 0;
                 }
                 else if (Remote.thrust > REMOTE_CENTER)
                 {

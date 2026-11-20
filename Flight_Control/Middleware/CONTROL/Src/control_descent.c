@@ -16,8 +16,14 @@ typedef enum
 #define DESC_ENTER_CM 20.0f
 // DESC_SOFT_CM：软着陆起始高度(cm)
 #define DESC_SOFT_CM 40.0f
-// DESC_TOUCH_CM：触地判定高度(cm)
+// DESC_TOUCH_CM：低空软着陆起始高度(cm)
 #define DESC_TOUCH_CM 12.0f
+// DESC_LOCK_CM：真正收尾上锁的高度(cm)
+#define DESC_LOCK_CM 4.0f
+// DESC_TOUCH_SPEED：低空目标下降速度(cm/s)
+#define DESC_TOUCH_SPEED (-6.0f)
+// DESC_TOUCH_THR_MIN：低空油门下限（保证还能托住机身）
+#define DESC_TOUCH_THR_MIN 200
 // DESC_TOUCH_CNT：触地确认拍数
 #define DESC_TOUCH_CNT 5
 // DESC_TIMEOUT_CNT：缓降超时拍数
@@ -179,16 +185,32 @@ void Control_Descent_Update(const IMU_Angle_t *pAngle, float dt)
         s_angle_cnt = 0;
     }
 
-    /* 触地判定：h<12cm 连续 5 拍上锁 */
+    /* 低空软着陆：12cm 以下不再直接切油门，而是放慢目标速度、给油门下限，
+       4cm 以下才收尾上锁，避免最后一段自由落体把飞机砸下去 */
     if (h < DESC_TOUCH_CM)
     {
-        if (++s_touch_cnt >= DESC_TOUCH_CNT)
+        s_pid.measured = Control.pid_height_rate.measured;
+        s_pid.desired = DESC_TOUCH_SPEED;
+        PID_Update(&s_pid, dt);
+        s_pid.integ = LIMIT(s_pid.integ, -DESC_INTEG_LIMIT, DESC_INTEG_LIMIT);
+
+        thr = (float)s_trim + s_pid.out;
+        Control.descent_thr = (int16_t)LIMIT(thr, (float)DESC_TOUCH_THR_MIN, (float)DESC_THR_MAX);
+
+        if (h < DESC_LOCK_CM)
         {
-            Control.descent_thr = 0;
-            Control.descent_active = 0;
-            s_state = DESC_DONE;
-            Remote_Set_Descent_Hold(0);
-            Remote_Set_Unlocked(0);
+            if (++s_touch_cnt >= DESC_TOUCH_CNT)
+            {
+                Control.descent_thr = 0;
+                Control.descent_active = 0;
+                s_state = DESC_DONE;
+                Remote_Set_Descent_Hold(0);
+                Remote_Set_Unlocked(0);
+            }
+        }
+        else
+        {
+            s_touch_cnt = 0;
         }
         return;
     }
