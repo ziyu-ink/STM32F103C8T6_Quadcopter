@@ -10,7 +10,8 @@
 #define TRIM_EEPROM_ROLL 24U  // 横滚配平 ×100（int16，单位 0.01°）
 #define TRIM_EEPROM_PITCH 25U // 俯仰配平 ×100
 
-/* 手势：四个摇杆同时拉到最低，保持 2s（10ms × 200）才进入测量，防误触 */
+/* 手势：油门、横滚、俯仰三个摇杆同时拉到最低，保持 2s（10ms × 200）才进入测量，防误触。
+   偏航不参与，避免和"解锁/上锁"手势混在一起。 */
 #define TRIM_GESTURE_TICKS 200U
 #define TRIM_STICK_LOW 1100
 
@@ -95,8 +96,8 @@ void Control_Trim_Update(const IMU_Angle_t *pAngle)
     switch (s_state)
     {
         case TRIM_IDLE:
-            /* 四杆同时最低 + 未解锁，保持 2s 才进入 */
-            if (!Remote_Is_Unlocked() && (Remote.thrust < TRIM_STICK_LOW) && (Remote.yaw < TRIM_STICK_LOW) &&
+            /* 油门 + 横滚 + 俯仰三杆同时最低 + 未解锁，保持 2s 才进入 */
+            if (!Remote_Is_Unlocked() && (Remote.thrust < TRIM_STICK_LOW) &&
                 (Remote.roll < TRIM_STICK_LOW) && (Remote.pitch < TRIM_STICK_LOW))
             {
                 if (++s_cnt >= TRIM_GESTURE_TICKS)
